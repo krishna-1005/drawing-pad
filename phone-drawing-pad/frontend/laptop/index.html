@@ -3,129 +3,745 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Phone Drawing Pad - Laptop Preview</title>
-    <!-- Modern Google Fonts -->
+    <title>DrawSync Studio — Wireless Drawing Tablet Companion</title>
+    <meta name="description" content="DrawSync Studio: Real-time high-fidelity drawing tablet engine for laptop and Krita with stylus hardware feed, layer stack, and precision reticle.">
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Main Style -->
     <link rel="stylesheet" href="/static/laptop/style.css">
 </head>
-<body>
-    <div class="app-container">
-        <!-- Floating Glassmorphic Header -->
-        <header class="top-header">
-            <div class="brand">
-                <span class="logo-icon">🎨</span>
-                <span class="logo-text">Phone Drawing Pad</span>
-                <span class="badge">Desktop View</span>
-            </div>
+<body class="mode-studio">
+    <div class="app-layout">
+        <!-- =========================================================
+             1. TOP APPLICATION TOOLBAR
+             ========================================================= -->
+        <header class="app-header">
+            <!-- Brand & Document Info -->
+            <div class="header-section left">
+                <div class="brand-badge-wrapper" title="DrawSync Studio V2.4">
+                    <div class="brand-icon-box">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <div class="brand-meta">
+                        <div class="brand-title-line">
+                            <span class="brand-name">DrawSync</span>
+                            <span class="hub-tag">HUB V2.4</span>
+                        </div>
+                        <span id="doc-name" class="doc-subtitle" contenteditable="true" spellcheck="false" title="Click to rename document">Artboard_Character_Final.dsp</span>
+                    </div>
+                </div>
 
-            <div class="header-center">
-                <!-- Phone Connection Indicator -->
-                <div id="phone-status-badge" class="phone-status-badge status-offline">
-                    <span class="status-beacon"></span>
-                    <span id="phone-status-text">AWAITING PHONE...</span>
+                <div class="toolbar-divider"></div>
+
+                <!-- History & Clear Icons -->
+                <div class="header-action-icons">
+                    <button id="btn-undo" class="quick-icon-btn" title="Undo (Ctrl+Z)" disabled>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 7v6h6"/>
+                            <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+                        </svg>
+                    </button>
+                    <button id="btn-redo" class="quick-icon-btn" title="Redo (Ctrl+Y)" disabled>
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 7v6h-6"/>
+                            <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/>
+                        </svg>
+                    </button>
+                    <button id="btn-clear-canvas" class="quick-icon-btn btn-trash" title="Clear Canvas">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Canvas Resolution & Zoom Pills -->
+                <div class="dimension-pill-group">
+                    <button id="canvas-dim-pill" class="info-pill dim-btn" title="Click to change canvas resolution">2048 × 1536 px</button>
+                    <button id="btn-zoom-pill" class="info-pill zoom-btn" title="Click to cycle zoom (100% / 125% / Fit)">100%</button>
                 </div>
             </div>
 
-            <div class="header-actions">
-                <!-- Canvas Background Grid Toggle -->
-                <button id="btn-toggle-grid" class="action-btn" title="Toggle Grid Overlay">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                        <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
-                    </svg>
-                </button>
+            <!-- Center: Device Telemetry Capsule -->
+            <div class="header-section center">
+                <div id="device-capsule" class="telemetry-capsule status-waiting" title="Click to view pairing details / QR code">
+                    <div class="capsule-part device-name-part">
+                        <svg class="phone-svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="5" y="2" width="14" height="20" rx="3" ry="3"/>
+                            <line x1="12" y1="18" x2="12.01" y2="18"/>
+                        </svg>
+                        <div class="device-text-group">
+                            <span id="device-model-label" class="device-model">No Device Paired</span>
+                        </div>
+                    </div>
 
-                <!-- Debug Drawer Toggle -->
-                <button id="btn-toggle-debug" class="action-btn" title="Toggle Connection Details">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 20h9"/>
-                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-                    </svg>
-                    <span id="event-counter" class="counter-badge">0</span>
-                </button>
+                    <div class="capsule-part conn-status-part">
+                        <span class="conn-dot"></span>
+                        <span id="device-conn-text" class="conn-text">Waiting for Phone</span>
+                    </div>
 
-                <!-- Clear Canvas Button -->
-                <button id="btn-clear-laptop" class="action-btn btn-danger" title="Clear Canvas">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                    </svg>
-                    <span>Clear</span>
-                </button>
+                    <div class="capsule-part metric-part">
+                        <span id="rtt-metric" class="metric-val">--</span>
+                        <span class="metric-label">RTT</span>
+                    </div>
 
-                <!-- Save PNG Button -->
-                <button id="btn-save" class="action-btn" title="Save Artwork">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
-                        <polyline points="17 21 17 13 7 13 7 21"/>
-                        <polyline points="7 3 7 8 15 8"/>
-                    </svg>
-                </button>
+                    <div class="capsule-part metric-part">
+                        <span id="fps-metric" class="metric-val">--</span>
+                        <span class="metric-label">FPS</span>
+                    </div>
 
-                <!-- Fullscreen Toggle -->
-                <button id="btn-fullscreen" class="action-btn" title="Toggle Fullscreen">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18-5h-3a2 2 0 0 0-2 2v3M3 16v3a2 2 0 0 0 2 2h3m11 0h3a2 2 0 0 0 2-2v-3"/>
+                    <div class="capsule-part battery-part" title="Device Battery Level">
+                        <div class="battery-icon-visual">
+                            <div id="battery-fill-bar" class="battery-fill" style="width: 100%;"></div>
+                        </div>
+                        <span id="battery-pct-label" class="battery-text">--</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right: Studio Modes, Export & Settings -->
+            <div class="header-section right">
+                <!-- Mode Switcher Pill -->
+                <div class="mode-segmented-control" id="mode-selector">
+                    <button class="mode-btn active" data-mode="studio" title="Studio Workspace with Panels">Studio</button>
+                    <button class="mode-btn" data-mode="split" title="Split Screen: Mobile Screen + Laptop Stage">Split</button>
+                    <button class="mode-btn" data-mode="stage" title="Stage: Distraction-free Maximized Canvas">Stage</button>
+                    <button class="mode-btn" data-mode="guide" title="Guide Me: Step-by-Step Setup Checklist">Guide</button>
+                </div>
+
+                <!-- Import Image & Clear Image Actions -->
+                <div class="header-import-wrapper">
+                    <button id="btn-import-header" class="header-action-btn btn-import-header" title="Import Reference Image / Photo (Syncs across Laptop & Mobile)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                        <span id="label-import-header">Import Image</span>
+                    </button>
+                    <button id="btn-clear-img-header" class="header-action-btn btn-clear-img-header hidden" title="Remove Imported Image">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="18" y1="6" x2="6" y2="18"></line>
+                            <line x1="6" y1="6" x2="18" y2="18"></line>
+                        </svg>
+                        <span>Clear Image</span>
+                    </button>
+                </div>
+
+                <!-- Export Action -->
+                <div class="export-dropdown-wrapper">
+                    <button id="btn-export-main" class="export-btn" title="Export Artwork">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="7 10 12 15 17 10"/>
+                            <line x1="12" y1="15" x2="12" y2="3"/>
+                        </svg>
+                        <span>Export</span>
+                    </button>
+                    <div id="export-menu-popup" class="dropdown-popup hidden">
+                        <button id="menu-save-png" class="popup-item">
+                            <span class="popup-title">Save as PNG</span>
+                            <span class="popup-sub">High-resolution flattened artwork</span>
+                        </button>
+                        <button id="menu-save-transparent-png" class="popup-item">
+                            <span class="popup-title">Save as Transparent PNG</span>
+                            <span class="popup-sub">Isolated strokes without background</span>
+                        </button>
+                        <button id="menu-save-svg" class="popup-item">
+                            <span class="popup-title">Save as SVG (Vector)</span>
+                            <span class="popup-sub">Scalable curves for Illustrator & Inkscape</span>
+                        </button>
+                        <div class="popup-divider"></div>
+                        <button id="menu-copy-clip" class="popup-item">
+                            <span class="popup-title">Copy to Clipboard</span>
+                            <span class="popup-sub">Paste instantly into Photoshop, Figma, Discord</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Canvas Options / Settings Trigger -->
+                <button id="btn-toggle-options" class="options-icon-btn" title="Canvas & Theme Options">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="4" y1="21" x2="4" y2="14"/>
+                        <line x1="4" y1="10" x2="4" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12" y2="3"/>
+                        <line x1="20" y1="21" x2="20" y2="16"/>
+                        <line x1="20" y1="10" x2="20" y2="3"/>
+                        <line x1="1" y1="14" x2="7" y2="14"/>
+                        <line x1="9" y1="8" x2="15" y2="8"/>
+                        <line x1="17" y1="16" x2="23" y2="16"/>
                     </svg>
                 </button>
             </div>
         </header>
 
-        <!-- Main Live Drawing Viewport -->
-        <main class="drawing-viewport" id="viewport">
-            <div id="canvas-wrapper" class="canvas-wrapper grid-pattern">
-                <canvas id="laptop-canvas"></canvas>
-            </div>
-        </main>
+        <!-- =========================================================
+             2. MAIN WORKSPACE CONTAINER
+             ========================================================= -->
+        <div class="workspace-viewport" id="workspace-viewport">
+            <!-- Left Floating Tool Dock -->
+            <nav class="floating-tool-dock" id="tool-dock">
+                <button class="dock-tool-btn active" data-brush="pen" title="Hard Inker / Pen">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                        <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                        <path d="M2 2l7.586 7.586"/>
+                        <circle cx="11" cy="11" r="2"/>
+                    </svg>
+                </button>
 
-        <!-- Collapsible Connection & Debug Info Panel -->
-        <aside id="debug-drawer" class="debug-drawer hidden">
-            <div class="drawer-header">
-                <h3>Connection & Stream Debug</h3>
-                <button id="btn-close-debug" class="close-btn">&times;</button>
-            </div>
-            <div class="drawer-body">
-                <div class="stat-grid">
-                    <div class="stat-card">
-                        <div class="stat-label">Phone Client</div>
-                        <div id="stat-phone-status" class="stat-val val-inactive">Disconnected</div>
+                <button class="dock-tool-btn" data-brush="pencil" title="Graphite Pencil">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                    </svg>
+                </button>
+
+                <button class="dock-tool-btn" data-brush="marker" title="Marker / Chisel Tip">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M14 2l6 6-4 4-6-6 4-4z"/>
+                        <path d="M3 21l3-1 9-9-4-4-9 9-1 3 2 2z"/>
+                    </svg>
+                </button>
+
+                <button class="dock-tool-btn" data-brush="soft" title="Soft Blend Brush">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="7"/>
+                        <circle cx="12" cy="12" r="3"/>
+                    </svg>
+                </button>
+
+                <button class="dock-tool-btn" data-brush="airbrush" title="Airbrush Spray">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="1"/>
+                        <circle cx="12" cy="5" r="1"/>
+                        <circle cx="12" cy="19" r="1"/>
+                        <circle cx="5" cy="12" r="1"/>
+                        <circle cx="19" cy="12" r="1"/>
+                        <circle cx="7" cy="7" r="1"/>
+                        <circle cx="17" cy="17" r="1"/>
+                    </svg>
+                </button>
+
+                <button class="dock-tool-btn" data-brush="eraser" title="Precision Eraser">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M20 20H7L3 16C2 15 2 13 3 12L13 2C14 1 16 1 17 2L21 6C22 7 22 9 21 10L11 20"/>
+                        <path d="M7 12l5 5"/>
+                    </svg>
+                </button>
+
+                <div class="dock-divider"></div>
+
+                <!-- Reference Image Import Button -->
+                <button id="btn-dock-import-img" class="dock-tool-btn" title="Import Reference Image / Photo (Syncs with Mobile)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                        <circle cx="8.5" cy="8.5" r="1.5"/>
+                        <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                </button>
+                <button id="btn-dock-clear-img" class="dock-tool-btn dock-btn-clear-img hidden" title="Clear Reference Image">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                    </svg>
+                </button>
+                <input type="file" id="input-laptop-import-image" accept="image/*" style="display: none;">
+
+                <!-- Active Swatches -->
+                <div id="swatch-primary" class="swatch-btn primary-swatch" title="Primary Color (Click to open Color Picker)">
+                    <span class="swatch-inner" style="background-color: #6366f1;"></span>
+                </div>
+                <div id="swatch-secondary" class="swatch-btn secondary-swatch" title="Secondary Accent (Click to swap with Primary)">
+                    <span class="swatch-inner" style="background-color: #ec4899;"></span>
+                </div>
+
+                <!-- Color Popover Card (Opened when clicking swatch) -->
+                <div id="color-popover" class="color-popover hidden">
+                    <div class="color-popover-header">
+                        <span class="popover-title">Color Palette</span>
+                        <button id="btn-swap-swatches" class="popover-swap-btn" title="Swap Colors">⇄</button>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Packets Recv</div>
-                        <div id="stat-packets" class="stat-val">0</div>
+                    <div class="color-swatches-grid" id="palette-chips-grid">
+                        <!-- Populated by JS -->
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Last Tool</div>
-                        <div id="stat-tool" class="stat-val">Brush</div>
+                    <div class="color-input-line">
+                        <span class="hash-tag">#</span>
+                        <input type="text" id="hex-color-input" maxlength="7" value="6366F1" spellcheck="false">
+                        <input type="color" id="native-color-picker" value="#6366f1" class="native-color-well">
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Pointer Type</div>
-                        <div id="stat-pointer" class="stat-val">Touch</div>
+                </div>
+            </nav>
+
+            <!-- Center Stage: Drawing Canvas -->
+            <main class="canvas-stage" id="canvas-stage">
+                <!-- Floating Canvas HUD Pill (Top of canvas) -->
+                <div class="canvas-hud-pill">
+                    <span class="hud-dot"></span>
+                    <span class="hud-item"><strong id="hud-phone-tool">Phone Tool: Hard Inker</strong></span>
+                    <span class="hud-separator">•</span>
+                    <span class="hud-item">Size: <span id="hud-brush-size">8px</span></span>
+                    <span class="hud-separator">•</span>
+                    <span class="hud-item hud-accent">Stream: <span id="hud-stream-protocol">Low-Latency UDP</span></span>
+                </div>
+
+                <!-- Canvas Mount Box -->
+                <div id="canvas-wrapper" class="canvas-mount">
+                    <canvas id="laptop-canvas"></canvas>
+
+                    <!-- Precision Stylus Reticle & Live HUD Tooltip -->
+                    <div id="stylus-reticle" class="stylus-reticle">
+                        <div class="reticle-outer-ring"></div>
+                        <div class="reticle-center-dot"></div>
+                        <div id="reticle-hud-badge" class="reticle-hud-badge">P: 64% · 41°</div>
+                    </div>
+
+                    <!-- Drag and Drop Overlay for Image Import -->
+                    <div id="canvas-drop-overlay" class="canvas-drop-overlay hidden">
+                        <div class="drop-overlay-box">
+                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                            <span class="drop-overlay-title">Drop Image to Import</span>
+                            <span class="drop-overlay-sub">Instantly syncs with mobile screen in real-time</span>
+                        </div>
                     </div>
                 </div>
 
-                <div class="debug-section">
-                    <h4>Latest Coordinates</h4>
-                    <div class="code-block">
-                        <div>Norm (x, y): <span id="debug-norm-coords">0.000, 0.000</span></div>
-                        <div>Px (x, y): <span id="debug-px-coords">0, 0</span></div>
-                        <div>Pressure: <span id="debug-pressure">0.50</span></div>
-                        <div>Color / Size: <span id="debug-color-size">#FFFFFF / 5px</span></div>
+                <!-- Split Mode Phone Preview (Activated in Split view) -->
+                <div id="split-phone-card" class="split-phone-container hidden">
+                    <div class="phone-frame-mockup">
+                        <div class="phone-speaker"></div>
+                        <div class="phone-inner-screen">
+                            <canvas id="split-phone-canvas"></canvas>
+                        </div>
+                        <div class="phone-home-indicator"></div>
+                    </div>
+                    <span class="split-caption">Mobile Companion Screen (Live Mirror)</span>
+                </div>
+
+                <!-- Bottom-Left Canvas Metadata Label -->
+                <div class="canvas-matrix-label" id="matrix-label">
+                    Active Touch Matrix: <span id="matrix-res">1080 × 2400</span> (<span id="matrix-scale">Phone Scale 1.0x</span>)
+                </div>
+            </main>
+
+            <!-- Right Sidebar: Device & Layers -->
+            <aside class="studio-sidebar" id="studio-sidebar">
+                <!-- Sidebar Header -->
+                <div class="sidebar-header-bar">
+                    <span class="sidebar-heading">DEVICE & LAYERS</span>
+                    <button id="btn-collapse-sidebar" class="collapse-link">Collapse</button>
+                </div>
+
+                <!-- Section 1: STYLUS HARDWARE FEED -->
+                <div class="sidebar-block">
+                    <div class="block-title-row">
+                        <span class="block-title">
+                            <svg class="block-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                            STYLUS HARDWARE FEED
+                        </span>
+                        <span id="feed-status-badge" class="tag-status tag-active">Active</span>
+                    </div>
+
+                    <!-- Stylus Pressure Bar -->
+                    <div class="pressure-feed-row">
+                        <div class="feed-label-line">
+                            <span class="feed-label">Stylus Pressure</span>
+                            <span id="pressure-ratio-text" class="feed-value">64% (2620 / 4096)</span>
+                        </div>
+                        <div class="feed-progress-track">
+                            <div id="pressure-progress-bar" class="feed-progress-fill" style="width: 64%;"></div>
+                        </div>
+                    </div>
+
+                    <!-- Tilt & Smoothing Metrics -->
+                    <div class="metrics-dual-grid">
+                        <div class="metric-card" id="card-tilt">
+                            <span class="card-label">Tilt Angle</span>
+                            <span id="tilt-metric-val" class="card-value">41.8°</span>
+                        </div>
+                        <div class="metric-card clickable-metric" id="card-smoothing" title="Click to cycle smoothing algorithm">
+                            <span class="card-label">Smoothing</span>
+                            <span id="smoothing-metric-val" class="card-value">Weighted (x4)</span>
+                        </div>
+                    </div>
+
+                    <!-- Palm Rejection Toggle -->
+                    <div class="toggle-control-row">
+                        <span class="toggle-text">Palm Rejection</span>
+                        <label class="switch-toggle" title="Toggle Palm Rejection filter">
+                            <input type="checkbox" id="chk-palm-rejection" checked>
+                            <span class="slider-round"></span>
+                        </label>
                     </div>
                 </div>
 
-                <div class="debug-section">
-                    <h4>Incoming Event Stream</h4>
-                    <div id="log-console" class="log-console">
-                        <div class="log-entry info">[System] Laptop renderer ready. Listening for phone stream...</div>
+                <!-- Section 2: NAVIGATOR -->
+                <div class="sidebar-block">
+                    <div class="block-title-row">
+                        <span class="block-title">NAVIGATOR</span>
+                        <button id="btn-fit-view" class="link-action">Fit View</button>
+                    </div>
+                    <div class="navigator-frame" id="navigator-frame" title="Artboard Navigator Overview">
+                        <canvas id="navigator-canvas" width="260" height="84"></canvas>
+                        <div class="navigator-viewport-box" id="nav-viewport-box"></div>
                     </div>
                 </div>
+
+                <!-- Section 3: LAYERS -->
+                <div class="sidebar-block layers-block">
+                    <div class="block-title-row">
+                        <span class="block-title">LAYERS</span>
+                        <button id="btn-add-layer" class="icon-action-btn" title="Add New Layer">+</button>
+                    </div>
+
+                    <div class="layer-stack-list" id="layer-list">
+                        <!-- Layer 3: Highlights -->
+                        <div class="layer-item" data-layer-id="layer-3">
+                            <button class="layer-eye-btn" title="Toggle Visibility">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                            <span class="layer-name">Layer 3 — Highlights</span>
+                            <span class="layer-opacity" title="Layer Opacity">100%</span>
+                        </div>
+
+                        <!-- Layer 2: Ink Lines (Active) -->
+                        <div class="layer-item active" data-layer-id="layer-2">
+                            <button class="layer-eye-btn" title="Toggle Visibility">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                            <span class="layer-name">Layer 2 — Ink Lines</span>
+                            <span class="active-layer-indicator"></span>
+                            <span class="layer-opacity" title="Layer Opacity">100%</span>
+                        </div>
+
+                        <!-- Layer 1: Rough Pencil -->
+                        <div class="layer-item" data-layer-id="layer-1">
+                            <button class="layer-eye-btn" title="Toggle Visibility">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                                    <circle cx="12" cy="12" r="3"/>
+                                </svg>
+                            </button>
+                            <span class="layer-name">Layer 1 — Rough Pencil</span>
+                            <span class="layer-opacity" title="Layer Opacity">45%</span>
+                        </div>
+
+                        <!-- Canvas Base (Locked) -->
+                        <div class="layer-item layer-locked" data-layer-id="layer-base">
+                            <span class="layer-icon-lock">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                                    <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                                </svg>
+                            </span>
+                            <span class="layer-name">Canvas Base (Dark Slate)</span>
+                            <span class="layer-lock-state">🔒</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Section 4: PAIR EXTRA DEVICE -->
+                <div class="pair-device-card" id="btn-pair-device">
+                    <div class="pair-qr-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <rect x="3" y="3" width="7" height="7"/>
+                            <rect x="14" y="3" width="7" height="7"/>
+                            <rect x="14" y="14" width="7" height="7"/>
+                            <rect x="3" y="14" width="7" height="7"/>
+                        </svg>
+                    </div>
+                    <div class="pair-card-details">
+                        <div class="pair-card-title">Pair Extra Device</div>
+                        <div class="pair-card-sub">Scan code via mobile browser</div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <!-- =========================================================
+             3. BOTTOM STATUS BAR (FOOTER)
+             ========================================================= -->
+        <footer class="app-footer">
+            <div class="footer-section left">
+                <div class="footer-status-pill">
+                    <span id="footer-stream-dot" class="dot-online"></span>
+                    <span id="footer-stream-text">Live Touch Streaming</span>
+                </div>
+                <div class="footer-divider"></div>
+                <div class="coords-display">
+                    <span>X: <strong id="foot-coord-x">468</strong></span>
+                    <span>Y: <strong id="foot-coord-y">298</strong></span>
+                </div>
+                <div class="footer-divider"></div>
+                <div class="pressure-curve-text" id="curve-text-btn" title="Click to cycle pressure curves">
+                    Pressure Curve: <span class="curve-spec" id="curve-spec-label">Cubic Bezier (Standard)</span>
+                </div>
             </div>
-        </aside>
+
+            <div class="footer-section right">
+                <div class="hotkey-hint">
+                    <kbd>Space</kbd> + Drag to Pan
+                </div>
+                <div class="hotkey-hint">
+                    <kbd>Cmd / Ctrl</kbd> + <kbd>Z</kbd> Undo
+                </div>
+                <div class="sync-tag-wrapper">
+                    <span class="sync-tag-text">Synced</span>
+                </div>
+                <div class="footer-divider"></div>
+                <div class="port-telemetry">
+                    <span>WebRTC Port: <strong>8443</strong></span>
+                    <span class="footer-divider-mini">•</span>
+                    <span class="realtime-text">Sync: Realtime</span>
+                </div>
+            </div>
+        </footer>
     </div>
 
-    <!-- Script loading -->
-    <script src="/static/laptop/app.js"></script>
+    <!-- =========================================================
+         4. MODALS & SLIDE-OVER PANELS
+         ========================================================= -->
+    <!-- QR Pairing Modal -->
+    <div id="pair-modal" class="modal-backdrop hidden">
+        <div class="modal-card">
+            <div class="modal-card-header">
+                <h3 class="modal-card-title">Pair Mobile Drawing Tablet</h3>
+                <button id="btn-close-pair-modal" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-card-body">
+                <div class="qr-preview-box" id="modal-qr-box"></div>
+                <p class="modal-instruction">Point your phone’s camera at this QR code or navigate to:</p>
+                <div class="url-input-group">
+                    <input type="text" id="modal-phone-url" readonly value="http://localhost:8080/phone">
+                    <button id="btn-modal-copy-url" class="btn-copy-link">Copy URL</button>
+                </div>
+                <div class="modal-tip-box">
+                    💡 Ensure your smartphone and laptop are connected to the same Wi-Fi router.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Guide Me Drawer (User Memory: Visited tick marks, persistent progress in localStorage, step-by-step instructions & reviews in sidebar) -->
+    <aside id="guide-drawer" class="guide-flyout hidden">
+        <div class="guide-flyout-header">
+            <div class="guide-title-box">
+                <h3>Guide Me: Setup & Companion Tour</h3>
+                <span class="guide-badge-pill">Interactive</span>
+            </div>
+            <button id="btn-close-guide" class="modal-close-btn">&times;</button>
+        </div>
+        <div class="guide-flyout-body">
+            <div class="guide-progress-summary">
+                <div class="progress-label-row">
+                    <span id="guide-step-count">0 of 5 steps completed</span>
+                    <span id="guide-percent-label">0%</span>
+                </div>
+                <div class="guide-bar-track">
+                    <div id="guide-bar-fill" class="guide-bar-fill" style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- Steps List with Visited Checkmarks and Review Panels -->
+            <div class="checklist-item" data-step="1">
+                <label class="check-label">
+                    <input type="checkbox" class="guide-chk" id="g-step-1">
+                    <span class="check-custom"></span>
+                    <span class="step-title">1. Connect Local Wi-Fi Network</span>
+                </label>
+                <p class="step-sub">Both laptop and smartphone must be on the same local network subnet.</p>
+                <details class="step-review-box">
+                    <summary class="review-toggle">Review Network Details</summary>
+                    <div class="review-content">
+                        Ensure AP Isolation is turned off in router settings. Test connectivity by pinging the laptop IP from your mobile browser.
+                    </div>
+                </details>
+            </div>
+
+            <div class="checklist-item" data-step="2">
+                <label class="check-label">
+                    <input type="checkbox" class="guide-chk" id="g-step-2">
+                    <span class="check-custom"></span>
+                    <span class="step-title">2. Open Phone Drawing Pad Canvas</span>
+                </label>
+                <p class="step-sub">Scan the QR code or navigate to <code>/phone</code> in your mobile browser.</p>
+                <details class="step-review-box">
+                    <summary class="review-toggle">Review Mobile Browser Tips</summary>
+                    <div class="review-content">
+                        For full-screen drawing without address bar distractions, choose "Add to Home Screen" on iOS Safari or Android Chrome.
+                    </div>
+                </details>
+            </div>
+
+            <div class="checklist-item" data-step="3">
+                <label class="check-label">
+                    <input type="checkbox" class="guide-chk" id="g-step-3">
+                    <span class="check-custom"></span>
+                    <span class="step-title">3. Calibrate Stylus & Pressure Levels</span>
+                </label>
+                <p class="step-sub">Toggle pressure sensitivity for Apple Pencil, S-Pen, or finger touch.</p>
+                <details class="step-review-box">
+                    <summary class="review-toggle">Review Calibration Info</summary>
+                    <div class="review-content">
+                        The engine listens to 4096 hardware pressure levels. Check the Stylus Hardware Feed in the right sidebar during drawing.
+                    </div>
+                </details>
+            </div>
+
+            <div class="checklist-item" data-step="4">
+                <label class="check-label">
+                    <input type="checkbox" class="guide-chk" id="g-step-4">
+                    <span class="check-custom"></span>
+                    <span class="step-title">4. Connect Krita Docker Plugin</span>
+                </label>
+                <p class="step-sub">In Krita, open Settings → Dockers → Phone Drawing Pad → Click Connect (127.0.0.1:8080).</p>
+                <details class="step-review-box">
+                    <summary class="review-toggle">Review Krita Integration</summary>
+                    <div class="review-content">
+                        Make sure the Python backend server is running via <code>python backend/main.py</code>. The Krita docker will auto-sync strokes to active layers.
+                    </div>
+                </details>
+            </div>
+
+            <div class="checklist-item" data-step="5">
+                <label class="check-label">
+                    <input type="checkbox" class="guide-chk" id="g-step-5">
+                    <span class="check-custom"></span>
+                    <span class="step-title">5. Export High-Res Artwork & Clipboard</span>
+                </label>
+                <p class="step-sub">Save flattened PNG or copy directly into Photoshop, Figma, or Discord.</p>
+                <details class="step-review-box">
+                    <summary class="review-toggle">Review Export Options</summary>
+                    <div class="review-content">
+                        Use the Export button in the top right to get transparent PNGs, flattened raster images, or instant system clipboard copies.
+                    </div>
+                </details>
+            </div>
+
+            <div class="guide-reset-row">
+                <button id="btn-reset-guide" class="btn-text-subtle">Reset Tour Progress</button>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Canvas Resolution Preset Modal -->
+    <div id="resolution-modal" class="modal-backdrop hidden">
+        <div class="modal-card small-modal">
+            <div class="modal-card-header">
+                <h3 class="modal-card-title">Canvas Resolution</h3>
+                <button id="btn-close-res-modal" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-card-body">
+                <p class="modal-instruction">Select a preset or input custom dimensions:</p>
+                <div class="preset-res-grid">
+                    <button class="res-preset-btn active" data-w="2048" data-h="1536">2048 × 1536 (Default)</button>
+                    <button class="res-preset-btn" data-w="1080" data-h="2400">1080 × 2400 (Phone Match)</button>
+                    <button class="res-preset-btn" data-w="1920" data-h="1080">1920 × 1080 (Full HD)</button>
+                    <button class="res-preset-btn" data-w="3840" data-h="2160">3840 × 2160 (4K UHD)</button>
+                    <button class="res-preset-btn" data-w="1080" data-h="1080">1080 × 1080 (Square 1:1)</button>
+                </div>
+                <div class="custom-res-row">
+                    <input type="number" id="input-custom-w" value="2048" placeholder="Width" min="400" max="8192">
+                    <span>×</span>
+                    <input type="number" id="input-custom-h" value="1536" placeholder="Height" min="400" max="8192">
+                    <button id="btn-apply-custom-res" class="btn-copy-link">Apply</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Canvas & Theme Options Modal (Triggered by top sliders button) -->
+    <div id="options-modal" class="modal-backdrop hidden">
+        <div class="modal-card">
+            <div class="modal-card-header">
+                <h3 class="modal-card-title">Canvas & Studio Preferences</h3>
+                <button id="btn-close-options-modal" class="modal-close-btn">&times;</button>
+            </div>
+            <div class="modal-card-body options-body">
+                <div class="pref-row">
+                    <span class="pref-label">Canvas Background Tone</span>
+                    <select id="select-canvas-bg" class="pref-select">
+                        <option value="#11141d" selected>Dark Slate (#11141d)</option>
+                        <option value="#06080d">Deep AMOLED Void (#06080d)</option>
+                        <option value="#1e2433">Navy Studio (#1e2433)</option>
+                        <option value="#262626">Neutral Charcoal (#262626)</option>
+                        <option value="#ffffff">Paper White (#ffffff)</option>
+                    </select>
+                </div>
+
+                <div class="pref-row">
+                    <span class="pref-label">Workspace Dot Grid</span>
+                    <select id="select-grid-style" class="pref-select">
+                        <option value="dots" selected>Subtle Dot Matrix</option>
+                        <option value="blueprint">Architectural Grid</option>
+                        <option value="none">Blank Canvas Board</option>
+                    </select>
+                </div>
+
+                <div class="pref-row">
+                    <span class="pref-label">Stylus Reticle Display</span>
+                    <select id="select-reticle-mode" class="pref-select">
+                        <option value="always" selected>Always Visible with Telemetry</option>
+                        <option value="stroke">Only When Drawing</option>
+                        <option value="hidden">Hidden</option>
+                    </select>
+                </div>
+
+                <div class="pref-row">
+                    <span class="pref-label">Pressure Curve Algorithm</span>
+                    <select id="select-pressure-curve" class="pref-select">
+                        <option value="cubic" selected>Cubic Bezier (Standard)</option>
+                        <option value="linear">Linear 1:1 Direct</option>
+                        <option value="soft">Soft Feathered (Sensitive)</option>
+                        <option value="firm">Firm Weighted (Heavy Hand)</option>
+                    </select>
+                </div>
+
+                <div class="pref-row">
+                    <span class="pref-label">Smoothing Filter</span>
+                    <select id="select-smoothing-algo" class="pref-select">
+                        <option value="medium" selected>Weighted (x4) — Balanced</option>
+                        <option value="low">Weighted (x2) — Responsive</option>
+                        <option value="high">Chaikin (x8) — Ultra-Smooth</option>
+                        <option value="off">Direct Raw (Direct)</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clear Confirmation Modal -->
+    <div id="clear-confirm-modal" class="modal-backdrop hidden">
+        <div class="modal-card small-modal">
+            <h3 class="modal-card-title">Clear Canvas?</h3>
+            <p class="modal-instruction">All active strokes on this artboard will be wiped. You can undo this action if needed.</p>
+            <div class="modal-btn-row">
+                <button id="btn-cancel-clear" class="btn-secondary">Cancel</button>
+                <button id="btn-confirm-clear" class="btn-danger">Clear All</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Shelf -->
+    <div id="toast-shelf" class="toast-shelf"></div>
+
+    <!-- Scripts -->
+    <script src="/static/laptop/qrcode.min.js"></script>
+    <script src="/static/laptop/app.js?v=studio_v12"></script>
 </body>
 </html>

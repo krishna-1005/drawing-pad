@@ -18,7 +18,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger("phone_drawing_pad")
 
+from fastapi.middleware.cors import CORSMiddleware
+
 app = FastAPI(title="Phone Drawing Pad", version="1.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+@app.middleware("http")
+async def add_no_cache_headers(request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    return response
 
 # Setup base directory paths
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -29,8 +47,10 @@ LAPTOP_DIR = FRONTEND_DIR / "laptop"
 # Mount static file directories
 if PHONE_DIR.exists():
     app.mount("/static/phone", StaticFiles(directory=str(PHONE_DIR)), name="static_phone")
+    app.mount("/phone", StaticFiles(directory=str(PHONE_DIR), html=True), name="phone_page")
 if LAPTOP_DIR.exists():
     app.mount("/static/laptop", StaticFiles(directory=str(LAPTOP_DIR)), name="static_laptop")
+    app.mount("/laptop", StaticFiles(directory=str(LAPTOP_DIR), html=True), name="laptop_page")
 
 
 def get_local_ip() -> str:
@@ -79,6 +99,7 @@ class ConnectionManager:
         self.phone_connections: Set[WebSocket] = set()
         self.laptop_connections: Set[WebSocket] = set()
         self.krita_connections: Set[WebSocket] = set()
+        self.current_image_state: Optional[Dict[str, Any]] = None
 
     async def connect(self, websocket: WebSocket, role: str):
         await websocket.accept()
@@ -94,6 +115,13 @@ class ConnectionManager:
             self.krita_connections.add(websocket)
             logger.info(f"Krita connected. Total Krita clients: {len(self.krita_connections)}")
             await self.send_status(websocket)
+
+        # Sync active background image if one exists
+        if self.current_image_state:
+            try:
+                await websocket.send_text(json.dumps(self.current_image_state))
+            except Exception:
+                pass
 
     def disconnect(self, websocket: WebSocket, role: str):
         if role == "phone" and websocket in self.phone_connections:
@@ -154,6 +182,23 @@ class ConnectionManager:
             self.laptop_connections.discard(ws)
             self.krita_connections.discard(ws)
 
+    async def broadcast_to_others(self, message: str, sender: WebSocket):
+        """Relays payload to all other connected clients regardless of role."""
+        all_clients = (self.phone_connections | self.laptop_connections | self.krita_connections)
+        disconnected = set()
+        for client_ws in all_clients:
+            if client_ws == sender:
+                continue
+            try:
+                await client_ws.send_text(message)
+            except Exception:
+                disconnected.add(client_ws)
+
+        for ws in disconnected:
+            self.phone_connections.discard(ws)
+            self.laptop_connections.discard(ws)
+            self.krita_connections.discard(ws)
+
 
 manager = ConnectionManager()
 
@@ -173,14 +218,42 @@ def validate_stroke_event(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     event_type = data.get("type")
     valid_types = {
         "stroke_start", "stroke_points", "stroke", "stroke_end", 
-        "undo", "redo", "clear", "sync_history", "ping", "client"
+        "undo", "redo", "clear", "sync_history", "ping", "client",
+        "import_image", "clear_image"
     }
     if event_type not in valid_types:
         return None
 
+    # Handle image import & clear events
+    if event_type == "import_image":
+        data_url = data.get("data_url", "")
+        if not isinstance(data_url, str) or not (data_url.startswith("data:image/") or data_url.startswith("data:application/octet-stream")):
+            return None
+        w = max(1.0, float(data.get("width", 800)))
+        h = max(1.0, float(data.get("height", 600)))
+        aspect = float(data.get("aspect_ratio", w / h))
+        return {
+            "type": "import_image",
+            "data_url": data_url,
+            "width": w,
+            "height": h,
+            "aspect_ratio": aspect,
+            "fit": str(data.get("fit", "contain")),
+            "opacity": max(0.0, min(1.0, float(data.get("opacity", 1.0))))
+        }
+
+    if event_type == "clear_image":
+        return {"type": "clear_image"}
+
     # Handle simple control events
-    if event_type in ["ping", "clear", "undo", "redo", "stroke_end"]:
+    if event_type in ["ping", "clear", "undo", "redo"]:
         return {"type": event_type}
+
+    if event_type == "stroke_end":
+        return {
+            "type": "stroke_end",
+            "stroke_id": str(data.get("stroke_id", ""))
+        }
 
     if event_type == "client":
         return {
@@ -270,6 +343,32 @@ def validate_stroke_event(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
 
 # HTTP Routes
+@app.get("/api/network-info")
+def get_network_info():
+    """Returns local network IP addresses and precomputed phone connection URLs."""
+    local_ip = get_local_ip()
+    all_ips = []
+    try:
+        _, _, ips = socket.gethostbyname_ex(socket.gethostname())
+        for ip in ips:
+            if not ip.startswith("127.") and ip not in all_ips:
+                all_ips.append(ip)
+    except Exception:
+        pass
+    if local_ip not in all_ips and not local_ip.startswith("127."):
+        all_ips.insert(0, local_ip)
+    if not all_ips:
+        all_ips = [local_ip]
+
+    return {
+        "primary_ip": local_ip,
+        "port": 8080,
+        "all_ips": all_ips,
+        "phone_url": f"http://{local_ip}:8080/phone",
+        "laptop_url": f"http://{local_ip}:8080/laptop"
+    }
+
+
 @app.get("/")
 def get_root():
     """Landing page offering choices to launch Phone or Laptop interface."""
@@ -423,8 +522,35 @@ def get_laptop():
     """Serves the laptop preview interface."""
     laptop_index = LAPTOP_DIR / "index.html"
     if laptop_index.exists():
-        return HTMLResponse(content=laptop_index.read_text(encoding="utf-8"))
+        return HTMLResponse(
+            content=laptop_index.read_text(encoding="utf-8"),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"}
+        )
     raise HTTPException(status_code=404, detail="Laptop interface file not found")
+
+
+@app.get("/style.css")
+def get_root_style():
+    f = LAPTOP_DIR / "style.css"
+    if f.exists():
+        return HTMLResponse(content=f.read_text(encoding="utf-8"), media_type="text/css")
+    raise HTTPException(status_code=404, detail="style.css not found")
+
+
+@app.get("/app.js")
+def get_root_app():
+    f = LAPTOP_DIR / "app.js"
+    if f.exists():
+        return HTMLResponse(content=f.read_text(encoding="utf-8"), media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="app.js not found")
+
+
+@app.get("/qrcode.min.js")
+def get_root_qrcode():
+    f = LAPTOP_DIR / "qrcode.min.js"
+    if f.exists():
+        return HTMLResponse(content=f.read_text(encoding="utf-8"), media_type="application/javascript")
+    raise HTTPException(status_code=404, detail="qrcode.min.js not found")
 
 
 # WebSocket Endpoint
@@ -440,8 +566,8 @@ async def websocket_endpoint(websocket: WebSocket, role: str = "phone"):
         while True:
             raw_data = await websocket.receive_text()
             
-            # Limit message payload length (64 KB limit)
-            if len(raw_data) > 65536:
+            # Limit message payload length (10 MB limit for high-res images)
+            if len(raw_data) > 10485760:
                 continue
 
             try:
@@ -467,9 +593,23 @@ async def websocket_endpoint(websocket: WebSocket, role: str = "phone"):
                     await manager.connect(websocket, current_role)
                 continue
 
-            # Broadcast stroke or clear actions from phone to display clients
+            # Handle image import & clear synchronization across both devices
+            if validated_event["type"] == "import_image":
+                manager.current_image_state = validated_event
+                await manager.broadcast_to_others(json.dumps(validated_event), websocket)
+                continue
+
+            if validated_event["type"] == "clear_image":
+                manager.current_image_state = None
+                await manager.broadcast_to_others(json.dumps(validated_event), websocket)
+                continue
+
+            # Broadcast stroke or clear actions
             if current_role == "phone":
                 await manager.broadcast_stroke(json.dumps(validated_event), websocket)
+            else:
+                # Desktop drawing or clear action relayed to phone/krita
+                await manager.broadcast_to_others(json.dumps(validated_event), websocket)
 
     except WebSocketDisconnect:
         manager.disconnect(websocket, current_role)

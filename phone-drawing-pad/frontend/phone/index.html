@@ -3,33 +3,83 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Phone Drawing Pad</title>
+    <title>DrawSync — Mobile Drawing Pad</title>
+    <meta name="theme-color" content="#080b12">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="/static/phone/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <style>
+        /* Instant anti-FOUC protection before external CSS resolves */
+        .hidden, [hidden],
+        .dock-drawer.hidden,
+        .drawer-pane.hidden,
+        .settings-overlay.hidden,
+        .modal-overlay.hidden,
+        .grid-overlay.hidden,
+        .zoom-badge.hidden {
+            display: none !important;
+        }
+        html, body {
+            margin: 0; padding: 0; width: 100%; height: 100%;
+            overflow: hidden; background-color: #080b12; color: #f8fafc;
+            touch-action: none;
+        }
+    </style>
+    <link rel="stylesheet" href="/static/phone/style.css?v=studio_v5">
 </head>
-<body>
+<body class="mobile-studio">
     <div class="phone-layout">
-        <!-- ============ TOP BAR ============ -->
+        <!-- ============ TOP APPLICATION BAR ============ -->
         <header class="top-bar">
             <div class="top-bar-left">
                 <button id="btn-undo" class="icon-btn" title="Undo" disabled>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 7v6h6"/>
+                        <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/>
+                    </svg>
                 </button>
                 <button id="btn-redo" class="icon-btn" title="Redo" disabled>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 7v6h-6"/>
+                        <path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/>
+                    </svg>
+                </button>
+                <button id="btn-fullscreen" class="icon-btn btn-zen" title="Zen Fullscreen Mode">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/>
+                    </svg>
                 </button>
             </div>
 
-            <div id="connection-badge" class="conn-badge conn-disconnected">
+            <!-- Telemetry Status Capsule -->
+            <div id="connection-badge" class="conn-badge conn-disconnected" title="Live Connection Status">
                 <span class="conn-dot"></span>
                 <span id="conn-text">Connecting…</span>
             </div>
 
             <div class="top-bar-right">
+                <!-- Theme Quick Cycle -->
+                <button id="btn-theme-quick" class="icon-btn" title="Cycle Canvas Theme">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="5"/>
+                        <line x1="12" y1="1" x2="12" y2="3"/>
+                        <line x1="12" y1="21" x2="12" y2="23"/>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/>
+                        <line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/>
+                        <line x1="1" y1="12" x2="3" y2="12"/>
+                        <line x1="21" y1="12" x2="23" y2="12"/>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/>
+                    </svg>
+                </button>
                 <button id="btn-settings" class="icon-btn" title="Settings">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="3"/>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                    </svg>
                 </button>
             </div>
         </header>
@@ -39,26 +89,33 @@
             <!-- Grid overlay — drawn with CSS, never captured in drawing data -->
             <div id="grid-overlay" class="grid-overlay hidden"></div>
             <canvas id="drawing-canvas"></canvas>
+
+            <!-- Floating Live Zoom Pill (shown during zoom/pan) -->
+            <button id="zoom-badge" class="zoom-badge hidden" title="Tap to reset view">
+                <span id="zoom-text">100%</span>
+                <span class="zoom-reset-label">Fit</span>
+            </button>
         </main>
 
-        <!-- ============ BOTTOM TOOLBAR ============ -->
-        <footer class="bottom-toolbar">
-            <!-- Row 1: Brush strip -->
-            <div class="toolbar-row brush-strip" id="brush-strip">
-                <button class="brush-btn active" data-brush="pen" title="Pen">🖊️<span>Pen</span></button>
-                <button class="brush-btn" data-brush="pencil" title="Pencil">✏️<span>Pencil</span></button>
-                <button class="brush-btn" data-brush="marker" title="Marker">🖍️<span>Marker</span></button>
-                <button class="brush-btn" data-brush="soft" title="Soft Brush">☁️<span>Soft</span></button>
-                <button class="brush-btn" data-brush="airbrush" title="Airbrush">💨<span>Air</span></button>
-                <button class="brush-btn eraser-btn" data-brush="eraser" title="Eraser">🧹<span>Eraser</span></button>
-            </div>
-
-            <!-- Row 2: Size + Opacity sliders with live preview -->
-            <div class="toolbar-row slider-row">
-                <div class="slider-wrap">
-                    <div class="slider-label">
-                        <span>Size</span>
-                        <div class="quick-sizes" id="quick-sizes">
+        <!-- ============ FLOATING MOBILE STUDIO DOCK ============ -->
+        <div class="studio-dock-container">
+            <!-- Popover Drawers (Sliders, Color, Tools) -->
+            <div id="dock-drawer" class="dock-drawer hidden" style="display: none;">
+                <!-- Tab 1: Size & Opacity -->
+                <div id="drawer-size" class="drawer-pane hidden" style="display: none;">
+                    <div class="drawer-header">
+                        <span class="drawer-title">Stroke Dynamics</span>
+                        <div class="brush-preview" id="brush-preview">
+                            <canvas id="preview-canvas" width="40" height="40"></canvas>
+                        </div>
+                    </div>
+                    <div class="drawer-slider-group">
+                        <div class="slider-header-line">
+                            <span class="slider-caption">Brush Size</span>
+                            <span id="size-val" class="slider-pill">12px</span>
+                        </div>
+                        <input type="range" id="slider-size" min="1" max="100" value="12">
+                        <div class="quick-size-bubble-row" id="quick-sizes">
                             <button data-size="2">2</button>
                             <button data-size="5">5</button>
                             <button data-size="10">10</button>
@@ -66,110 +123,244 @@
                             <button data-size="40">40</button>
                             <button data-size="80">80</button>
                         </div>
-                        <span id="size-val" class="slider-val">12px</span>
                     </div>
-                    <input type="range" id="slider-size" min="1" max="100" value="12">
-                </div>
-                <div class="slider-wrap">
-                    <div class="slider-label">
-                        <span>Opacity</span>
-                        <span id="opacity-val" class="slider-val">100%</span>
+                    <div class="drawer-slider-group">
+                        <div class="slider-header-line">
+                            <span class="slider-caption">Opacity / Flow</span>
+                            <span id="opacity-val" class="slider-pill">100%</span>
+                        </div>
+                        <input type="range" id="slider-opacity" min="5" max="100" value="100">
                     </div>
-                    <input type="range" id="slider-opacity" min="5" max="100" value="100">
                 </div>
-                <!-- Brush preview swatch -->
-                <div class="brush-preview" id="brush-preview">
-                    <canvas id="preview-canvas" width="40" height="40"></canvas>
+
+                <!-- Tab 2: Color Palette -->
+                <div id="drawer-color" class="drawer-pane hidden" style="display: none;">
+                    <div class="drawer-header">
+                        <span class="drawer-title">Studio Palette</span>
+                        <span class="drawer-subtitle">Harmonious Color Swatches</span>
+                    </div>
+                    <div class="color-swatches-grid">
+                        <button class="color-dot active" data-color="#ffffff" style="background:#ffffff" title="Pure White"></button>
+                        <button class="color-dot" data-color="#000000" style="background:#000000" title="Carbon Black"></button>
+                        <button class="color-dot" data-color="#6366f1" style="background:#6366f1" title="Royal Indigo"></button>
+                        <button class="color-dot" data-color="#38bdf8" style="background:#38bdf8" title="Sky Cyan"></button>
+                        <button class="color-dot" data-color="#10b981" style="background:#10b981" title="Emerald Green"></button>
+                        <button class="color-dot" data-color="#f59e0b" style="background:#f59e0b" title="Warm Amber"></button>
+                        <button class="color-dot" data-color="#f97316" style="background:#f97316" title="Bright Orange"></button>
+                        <button class="color-dot" data-color="#f43f5e" style="background:#f43f5e" title="Neon Rose"></button>
+                        <button class="color-dot" data-color="#ec4899" style="background:#ec4899" title="Hot Pink"></button>
+                        <button class="color-dot" data-color="#a855f7" style="background:#a855f7" title="Electric Purple"></button>
+                        <label class="color-custom" title="Custom Spectrum Picker">
+                            <input type="color" id="input-custom-color" value="#ffffff">
+                            <span class="picker-wheel-icon">🎨</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Tab 3: Actions & Smoothing -->
+                <div id="drawer-tools" class="drawer-pane hidden" style="display: none;">
+                    <div class="drawer-header">
+                        <span class="drawer-title">Stabilization & Canvas</span>
+                    </div>
+                    <div class="tool-section">
+                        <span class="section-sub">Line Smoothing (Chaikin)</span>
+                        <div class="smooth-segmented" id="smooth-group">
+                            <button class="smooth-btn" data-smooth="off">Off</button>
+                            <button class="smooth-btn" data-smooth="low">Low</button>
+                            <button class="smooth-btn active" data-smooth="medium">Med</button>
+                            <button class="smooth-btn" data-smooth="high">High</button>
+                        </div>
+                    </div>
+                    <div class="tool-section">
+                        <span class="section-sub">Screen Fit Mode</span>
+                        <div class="smooth-segmented" id="fit-group">
+                            <button class="fit-btn active" data-fit="auto" title="1:1 Exact Artboard & Image Aspect Ratio">1:1 Fit</button>
+                            <button class="fit-btn" data-fit="phone" title="Full Phone Screen (Edge-to-Edge)">Full Phone</button>
+                            <button class="fit-btn" data-fit="landscape" title="16:9 Landscape Laptop Format">16:9</button>
+                        </div>
+                    </div>
+                    <div class="tool-section">
+                        <span class="section-sub">Reference Artwork / Photo</span>
+                        <div class="tool-action-row">
+                            <button id="btn-import-img-phone" class="action-card-btn" title="Import Image / Photo">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                <span id="label-import-img-phone">Import Image</span>
+                            </button>
+                            <button id="btn-clear-img-phone" class="action-card-btn action-danger hidden" style="display: none;" title="Remove Reference Image">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <span>Remove Image</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="tool-action-row">
+                        <button id="btn-zoom-fit" class="action-card-btn" title="Fit / Reset Canvas">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                            <span>Fit View</span>
+                        </button>
+                        <button id="btn-grid-toggle" class="action-card-btn" title="Toggle Grid Overlay">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                            <span>Grid</span>
+                        </button>
+                        <button id="btn-clear" class="action-card-btn action-danger" title="Clear Canvas">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            <span>Clear</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <!-- Row 3: Color palette -->
-            <div class="toolbar-row color-row">
-                <button class="color-dot active" data-color="#000000" style="background:#000000" title="Black"></button>
-                <button class="color-dot" data-color="#ffffff" style="background:#ffffff;border-color:rgba(255,255,255,.4)" title="White"></button>
-                <button class="color-dot" data-color="#ef4444" style="background:#ef4444" title="Red"></button>
-                <button class="color-dot" data-color="#f97316" style="background:#f97316" title="Orange"></button>
-                <button class="color-dot" data-color="#eab308" style="background:#eab308" title="Yellow"></button>
-                <button class="color-dot" data-color="#10b981" style="background:#10b981" title="Green"></button>
-                <button class="color-dot" data-color="#3b82f6" style="background:#3b82f6" title="Blue"></button>
-                <button class="color-dot" data-color="#a855f7" style="background:#a855f7" title="Purple"></button>
-                <button class="color-dot" data-color="#ec4899" style="background:#ec4899" title="Pink"></button>
-                <label class="color-custom" title="Custom Color">
-                    <input type="color" id="input-custom-color" value="#000000">
-                    <span>🎨</span>
-                </label>
-            </div>
+            <input type="file" id="input-import-image" accept="image/*" style="display: none;">
 
-            <!-- Row 4: Secondary tools -->
-            <div class="toolbar-row secondary-row">
-                <div class="smooth-group" id="smooth-group">
-                    <span class="smooth-label">Smooth:</span>
-                    <button class="smooth-btn" data-smooth="off">Off</button>
-                    <button class="smooth-btn" data-smooth="low">Low</button>
-                    <button class="smooth-btn active" data-smooth="medium">Med</button>
-                    <button class="smooth-btn" data-smooth="high">High</button>
+            <!-- Primary Bottom Dock (Always Ergonomic & Compact) -->
+            <footer class="bottom-dock" id="bottom-dock">
+                <!-- Brush Strip with Crisp Vector SVGs -->
+                <div class="brush-selector" id="brush-strip">
+                    <button class="brush-btn active" data-brush="pen" title="Hard Inker / Pen">
+                        <svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 19l7-7 3 3-7 7-3-3z"/>
+                            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/>
+                            <circle cx="11" cy="11" r="2"/>
+                        </svg>
+                        <span>Pen</span>
+                    </button>
+                    <button class="brush-btn" data-brush="pencil" title="Graphite Pencil">
+                        <svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
+                        </svg>
+                        <span>Pencil</span>
+                    </button>
+                    <button class="brush-btn" data-brush="marker" title="Marker / Chisel Tip">
+                        <svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2l6 6-4 4-6-6 4-4z"/>
+                            <path d="M3 21l3-1 9-9-4-4-9 9-1 3 2 2z"/>
+                        </svg>
+                        <span>Marker</span>
+                    </button>
+                    <button class="brush-btn" data-brush="soft" title="Soft Blend">
+                        <svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <circle cx="12" cy="12" r="7"/>
+                            <circle cx="12" cy="12" r="3"/>
+                        </svg>
+                        <span>Soft</span>
+                    </button>
+                    <button class="brush-btn" data-brush="airbrush" title="Airbrush Spray">
+                        <svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <circle cx="12" cy="12" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/>
+                            <circle cx="5" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/><circle cx="7" cy="7" r="1.5"/><circle cx="17" cy="17" r="1.5"/>
+                        </svg>
+                        <span>Air</span>
+                    </button>
+                    <button class="brush-btn eraser-btn" data-brush="eraser" title="Precision Eraser">
+                        <svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M20 20H7L3 16C2 15 2 13 3 12L13 2C14 1 16 1 17 2L21 6C22 7 22 9 21 10L11 20"/>
+                            <path d="M7 12l5 5"/>
+                        </svg>
+                        <span>Eraser</span>
+                    </button>
                 </div>
-                <div class="sec-actions">
-                    <button id="btn-zoom-fit" class="sec-btn" title="Fit / Reset View">⊞ Fit</button>
-                    <button id="btn-grid-toggle" class="sec-btn" title="Toggle Grid">▦ Grid</button>
-                    <button id="btn-clear" class="sec-btn sec-danger" title="Clear Canvas">🗑 Clear</button>
+
+                <div class="dock-divider"></div>
+
+                <!-- Secondary Quick Flyout Controls -->
+                <div class="dock-control-group">
+                    <!-- Size Pill Trigger -->
+                    <button id="tab-trigger-size" class="dock-tab-btn" title="Adjust Size & Opacity">
+                        <span id="dock-size-label" class="size-text-pill">12px</span>
+                    </button>
+
+                    <!-- Active Color Circle Trigger -->
+                    <button id="tab-trigger-color" class="dock-tab-btn color-bubble-btn" title="Open Color Palette">
+                        <span id="dock-color-bubble" class="color-bubble-swatch" style="background-color: #ffffff;"></span>
+                    </button>
+
+                    <!-- Actions / Tools Trigger -->
+                    <button id="tab-trigger-tools" class="dock-tab-btn" title="Smoothing & Tools">
+                        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/>
+                            <line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/>
+                            <line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="10" x2="20" y2="3"/>
+                            <line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/>
+                        </svg>
+                    </button>
                 </div>
-            </div>
-        </footer>
+            </footer>
+        </div>
     </div>
 
     <!-- ============ SETTINGS PANEL OVERLAY ============ -->
-    <div id="settings-panel" class="settings-overlay hidden">
+    <div id="settings-panel" class="settings-overlay hidden" style="display: none;">
         <div class="settings-card">
             <div class="settings-header">
-                <h3>⚙️ Settings</h3>
-                <button id="btn-close-settings" class="close-btn">&times;</button>
+                <div class="settings-title-group">
+                    <span class="settings-icon-box">⚙️</span>
+                    <h3>Studio Preferences</h3>
+                </div>
+                <button id="btn-close-settings" class="close-btn" title="Close Settings">&times;</button>
             </div>
             <div class="settings-body">
                 <div class="setting-row">
-                    <span>Pressure Sensitivity</span>
+                    <div class="setting-meta">
+                        <span class="setting-name">Pressure Sensitivity</span>
+                        <span class="setting-desc">Apple Pencil / S-Pen 4096 levels</span>
+                    </div>
                     <button id="btn-pressure" class="toggle-chip active">ON</button>
                 </div>
                 <div class="setting-row">
-                    <span>Grid Spacing</span>
+                    <div class="setting-meta">
+                        <span class="setting-name">Grid Spacing</span>
+                        <span class="setting-desc">Background visual alignment guide</span>
+                    </div>
                     <select id="select-grid-size" class="setting-select">
-                        <option value="16">16px</option>
-                        <option value="24" selected>24px</option>
-                        <option value="32">32px</option>
-                        <option value="48">48px</option>
-                        <option value="64">64px</option>
+                        <option value="16">16px Fine</option>
+                        <option value="24" selected>24px Standard</option>
+                        <option value="32">32px Medium</option>
+                        <option value="48">48px Broad</option>
+                        <option value="64">64px Block</option>
                     </select>
                 </div>
                 <div class="setting-row">
-                    <span>Canvas Background</span>
+                    <div class="setting-meta">
+                        <span class="setting-name">Canvas Artboard Tone</span>
+                        <span class="setting-desc">Viewport background contrast</span>
+                    </div>
                     <select id="select-bg" class="setting-select">
-                        <option value="#111726" selected>Dark</option>
-                        <option value="#1e293b">Slate</option>
-                        <option value="#ffffff">White</option>
-                        <option value="#f1f5f9">Light Gray</option>
+                        <option value="#111726" selected>Dark Slate (#111726)</option>
+                        <option value="#06080d">Deep AMOLED Void (#06080d)</option>
+                        <option value="#1e293b">Navy Graphite (#1e293b)</option>
+                        <option value="#ffffff">Paper White (#ffffff)</option>
+                        <option value="#f1f5f9">Light Studio (#f1f5f9)</option>
                     </select>
                 </div>
-                <div class="setting-row">
-                    <span>Canvas Reset</span>
-                    <button id="btn-full-reset" class="setting-btn danger">Reset Everything</button>
+                <div class="setting-row reset-row">
+                    <div class="setting-meta">
+                        <span class="setting-name">Full Reset</span>
+                        <span class="setting-desc">Wipe artboard & reset zoom / pan</span>
+                    </div>
+                    <button id="btn-full-reset" class="setting-btn danger">Reset Canvas</button>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- ============ CLEAR CONFIRM MODAL ============ -->
-    <div id="clear-modal" class="modal-overlay hidden">
+    <div id="clear-modal" class="modal-overlay hidden" style="display: none;">
         <div class="modal-card">
-            <div class="modal-icon">⚠️</div>
-            <h3>Clear Canvas?</h3>
-            <p>Your drawing will be cleared. You can use Undo to restore strokes.</p>
+            <div class="modal-icon-badge">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2.2">
+                    <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                    <line x1="12" y1="9" x2="12" y2="13"/>
+                    <line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+            </div>
+            <h3>Clear Artboard?</h3>
+            <p>Your strokes on the mobile canvas and laptop display will be wiped. You can undo if needed.</p>
             <div class="modal-actions">
                 <button id="btn-modal-cancel" class="modal-btn btn-sec">Cancel</button>
-                <button id="btn-modal-confirm" class="modal-btn btn-danger-fill">Clear</button>
+                <button id="btn-modal-confirm" class="modal-btn btn-danger-fill">Clear All</button>
             </div>
         </div>
     </div>
 
-    <script src="/static/phone/app.js"></script>
+    <script src="/static/phone/app.js?v=studio_v12"></script>
 </body>
 </html>
