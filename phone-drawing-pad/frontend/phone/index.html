@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Phone Drawing Pad</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/phone/style.css">
+</head>
+<body>
+    <div class="phone-layout">
+        <!-- ============ TOP BAR ============ -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <button id="btn-undo" class="icon-btn" title="Undo" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                </button>
+                <button id="btn-redo" class="icon-btn" title="Redo" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+                </button>
+            </div>
+
+            <div id="connection-badge" class="conn-badge conn-disconnected">
+                <span class="conn-dot"></span>
+                <span id="conn-text">Connecting…</span>
+            </div>
+
+            <div class="top-bar-right">
+                <button id="btn-settings" class="icon-btn" title="Settings">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- ============ CANVAS VIEWPORT ============ -->
+        <main class="canvas-viewport" id="canvas-viewport">
+            <!-- Grid overlay — drawn with CSS, never captured in drawing data -->
+            <div id="grid-overlay" class="grid-overlay hidden"></div>
+            <canvas id="drawing-canvas"></canvas>
+        </main>
+
+        <!-- ============ BOTTOM TOOLBAR ============ -->
+        <footer class="bottom-toolbar">
+            <!-- Row 1: Brush strip -->
+            <div class="toolbar-row brush-strip" id="brush-strip">
+                <button class="brush-btn active" data-brush="pen" title="Pen">🖊️<span>Pen</span></button>
+                <button class="brush-btn" data-brush="pencil" title="Pencil">✏️<span>Pencil</span></button>
+                <button class="brush-btn" data-brush="marker" title="Marker">🖍️<span>Marker</span></button>
+                <button class="brush-btn" data-brush="soft" title="Soft Brush">☁️<span>Soft</span></button>
+                <button class="brush-btn" data-brush="airbrush" title="Airbrush">💨<span>Air</span></button>
+                <button class="brush-btn eraser-btn" data-brush="eraser" title="Eraser">🧹<span>Eraser</span></button>
+            </div>
+
+            <!-- Row 2: Size + Opacity sliders with live preview -->
+            <div class="toolbar-row slider-row">
+                <div class="slider-wrap">
+                    <div class="slider-label">
+                        <span>Size</span>
+                        <div class="quick-sizes" id="quick-sizes">
+                            <button data-size="2">2</button>
+                            <button data-size="5">5</button>
+                            <button data-size="10">10</button>
+                            <button data-size="20" class="active">20</button>
+                            <button data-size="40">40</button>
+                            <button data-size="80">80</button>
+                        </div>
+                        <span id="size-val" class="slider-val">12px</span>
+                    </div>
+                    <input type="range" id="slider-size" min="1" max="100" value="12">
+                </div>
+                <div class="slider-wrap">
+                    <div class="slider-label">
+                        <span>Opacity</span>
+                        <span id="opacity-val" class="slider-val">100%</span>
+                    </div>
+                    <input type="range" id="slider-opacity" min="5" max="100" value="100">
+                </div>
+                <!-- Brush preview swatch -->
+                <div class="brush-preview" id="brush-preview">
+                    <canvas id="preview-canvas" width="40" height="40"></canvas>
+                </div>
+            </div>
+
+            <!-- Row 3: Color palette -->
+            <div class="toolbar-row color-row">
+                <button class="color-dot active" data-color="#000000" style="background:#000000" title="Black"></button>
+                <button class="color-dot" data-color="#ffffff" style="background:#ffffff;border-color:rgba(255,255,255,.4)" title="White"></button>
+                <button class="color-dot" data-color="#ef4444" style="background:#ef4444" title="Red"></button>
+                <button class="color-dot" data-color="#f97316" style="background:#f97316" title="Orange"></button>
+                <button class="color-dot" data-color="#eab308" style="background:#eab308" title="Yellow"></button>
+                <button class="color-dot" data-color="#10b981" style="background:#10b981" title="Green"></button>
+                <button class="color-dot" data-color="#3b82f6" style="background:#3b82f6" title="Blue"></button>
+                <button class="color-dot" data-color="#a855f7" style="background:#a855f7" title="Purple"></button>
+                <button class="color-dot" data-color="#ec4899" style="background:#ec4899" title="Pink"></button>
+                <label class="color-custom" title="Custom Color">
+                    <input type="color" id="input-custom-color" value="#000000">
+                    <span>🎨</span>
+                </label>
+            </div>
+
+            <!-- Row 4: Secondary tools -->
+            <div class="toolbar-row secondary-row">
+                <div class="smooth-group" id="smooth-group">
+                    <span class="smooth-label">Smooth:</span>
+                    <button class="smooth-btn" data-smooth="off">Off</button>
+                    <button class="smooth-btn" data-smooth="low">Low</button>
+                    <button class="smooth-btn active" data-smooth="medium">Med</button>
+                    <button class="smooth-btn" data-smooth="high">High</button>
+                </div>
+                <div class="sec-actions">
+                    <button id="btn-zoom-fit" class="sec-btn" title="Fit / Reset View">⊞ Fit</button>
+                    <button id="btn-grid-toggle" class="sec-btn" title="Toggle Grid">▦ Grid</button>
+                    <button id="btn-clear" class="sec-btn sec-danger" title="Clear Canvas">🗑 Clear</button>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- ============ SETTINGS PANEL OVERLAY ============ -->
+    <div id="settings-panel" class="settings-overlay hidden">
+        <div class="settings-card">
+            <div class="settings-header">
+                <h3>⚙️ Settings</h3>
+                <button id="btn-close-settings" class="close-btn">&times;</button>
+            </div>
+            <div class="settings-body">
+                <div class="setting-row">
+                    <span>Pressure Sensitivity</span>
+                    <button id="btn-pressure" class="toggle-chip active">ON</button>
+                </div>
+                <div class="setting-row">
+                    <span>Grid Spacing</span>
+                    <select id="select-grid-size" class="setting-select">
+                        <option value="16">16px</option>
+                        <option value="24" selected>24px</option>
+                        <option value="32">32px</option>
+                        <option value="48">48px</option>
+                        <option value="64">64px</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <span>Canvas Background</span>
+                    <select id="select-bg" class="setting-select">
+                        <option value="#111726" selected>Dark</option>
+                        <option value="#1e293b">Slate</option>
+                        <option value="#ffffff">White</option>
+                        <option value="#f1f5f9">Light Gray</option>
+                    </select>
+                </div>
+                <div class="setting-row">
+                    <span>Canvas Reset</span>
+                    <button id="btn-full-reset" class="setting-btn danger">Reset Everything</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============ CLEAR CONFIRM MODAL ============ -->
+    <div id="clear-modal" class="modal-overlay hidden">
+        <div class="modal-card">
+            <div class="modal-icon">⚠️</div>
+            <h3>Clear Canvas?</h3>
+            <p>Your drawing will be cleared. You can use Undo to restore strokes.</p>
+            <div class="modal-actions">
+                <button id="btn-modal-cancel" class="modal-btn btn-sec">Cancel</button>
+                <button id="btn-modal-confirm" class="modal-btn btn-danger-fill">Clear</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/phone/app.js"></script>
+</body>
+</html>

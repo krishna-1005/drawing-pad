@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Phone Drawing Pad - Laptop Preview</title>
+    <!-- Modern Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/laptop/style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Floating Glassmorphic Header -->
+        <header class="top-header">
+            <div class="brand">
+                <span class="logo-icon">🎨</span>
+                <span class="logo-text">Phone Drawing Pad</span>
+                <span class="badge">Desktop View</span>
+            </div>
+
+            <div class="header-center">
+                <!-- Phone Connection Indicator -->
+                <div id="phone-status-badge" class="phone-status-badge status-offline">
+                    <span class="status-beacon"></span>
+                    <span id="phone-status-text">AWAITING PHONE...</span>
+                </div>
+            </div>
+
+            <div class="header-actions">
+                <!-- Canvas Background Grid Toggle -->
+                <button id="btn-toggle-grid" class="action-btn" title="Toggle Grid Overlay">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="18" height="18" rx="2"/>
+                        <path d="M3 9h18M3 15h18M9 3v18M15 3v18"/>
+                    </svg>
+                </button>
+
+                <!-- Debug Drawer Toggle -->
+                <button id="btn-toggle-debug" class="action-btn" title="Toggle Connection Details">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 20h9"/>
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+                    </svg>
+                    <span id="event-counter" class="counter-badge">0</span>
+                </button>
+
+                <!-- Clear Canvas Button -->
+                <button id="btn-clear-laptop" class="action-btn btn-danger" title="Clear Canvas">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                    </svg>
+                    <span>Clear</span>
+                </button>
+
+                <!-- Save PNG Button -->
+                <button id="btn-save" class="action-btn" title="Save Artwork">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                        <polyline points="17 21 17 13 7 13 7 21"/>
+                        <polyline points="7 3 7 8 15 8"/>
+                    </svg>
+                </button>
+
+                <!-- Fullscreen Toggle -->
+                <button id="btn-fullscreen" class="action-btn" title="Toggle Fullscreen">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M8 3H5a2 2 0 0 0-2 2v3m18-5h-3a2 2 0 0 0-2 2v3M3 16v3a2 2 0 0 0 2 2h3m11 0h3a2 2 0 0 0 2-2v-3"/>
+                    </svg>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Live Drawing Viewport -->
+        <main class="drawing-viewport" id="viewport">
+            <div id="canvas-wrapper" class="canvas-wrapper grid-pattern">
+                <canvas id="laptop-canvas"></canvas>
+            </div>
+        </main>
+
+        <!-- Collapsible Connection & Debug Info Panel -->
+        <aside id="debug-drawer" class="debug-drawer hidden">
+            <div class="drawer-header">
+                <h3>Connection & Stream Debug</h3>
+                <button id="btn-close-debug" class="close-btn">&times;</button>
+            </div>
+            <div class="drawer-body">
+                <div class="stat-grid">
+                    <div class="stat-card">
+                        <div class="stat-label">Phone Client</div>
+                        <div id="stat-phone-status" class="stat-val val-inactive">Disconnected</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Packets Recv</div>
+                        <div id="stat-packets" class="stat-val">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Last Tool</div>
+                        <div id="stat-tool" class="stat-val">Brush</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-label">Pointer Type</div>
+                        <div id="stat-pointer" class="stat-val">Touch</div>
+                    </div>
+                </div>
+
+                <div class="debug-section">
+                    <h4>Latest Coordinates</h4>
+                    <div class="code-block">
+                        <div>Norm (x, y): <span id="debug-norm-coords">0.000, 0.000</span></div>
+                        <div>Px (x, y): <span id="debug-px-coords">0, 0</span></div>
+                        <div>Pressure: <span id="debug-pressure">0.50</span></div>
+                        <div>Color / Size: <span id="debug-color-size">#FFFFFF / 5px</span></div>
+                    </div>
+                </div>
+
+                <div class="debug-section">
+                    <h4>Incoming Event Stream</h4>
+                    <div id="log-console" class="log-console">
+                        <div class="log-entry info">[System] Laptop renderer ready. Listening for phone stream...</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- Script loading -->
+    <script src="/static/laptop/app.js"></script>
+</body>
+</html>

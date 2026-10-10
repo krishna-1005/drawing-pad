@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Service
+ServiceTypes=Krita/PythonPlugin
+X-KDE-Library=phone_drawing_pad
+X-Python-2-Compatible=false
+Name=Phone Drawing Pad
+Comment=Connects phone touch drawing directly to active Krita canvas over WebSocket.
