@@ -312,6 +312,15 @@
                     </div>
                 </div>
 
+                <!-- Text Tool Button (Dynamic Auto-Fit Box) -->
+                <button class="dock-tool-btn" id="btn-dock-text" data-brush="text" title="Smart Text Box (T) — Auto-detect margins & dynamic auto-fit">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="4 7 4 4 20 4 20 7"/>
+                        <line x1="9" y1="20" x2="15" y2="20"/>
+                        <line x1="12" y1="4" x2="12" y2="20"/>
+                    </svg>
+                </button>
+
                 <div class="dock-divider"></div>
 
                 <!-- Reference Image Import Button -->
@@ -443,6 +452,92 @@
                         <div id="reticle-outer-ring" class="reticle-outer-ring"></div>
                         <div class="reticle-center-dot"></div>
                         <div id="reticle-hud-badge" class="reticle-hud-badge"><span class="badge-size">8px</span> · <span class="badge-pressure">Hover</span></div>
+                    </div>
+
+                    <!-- Smart Text Box Live Interactive Overlay -->
+                    <div id="smart-text-overlay" class="smart-text-overlay hidden">
+                        <!-- Floating Toolbar above the card -->
+                        <div class="smart-text-toolbar" id="smart-text-toolbar">
+                            <!-- Move Handle Grip in Toolbar -->
+                            <div class="text-tb-drag-handle" id="tb-drag-handle" title="Drag to Move Text Box">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                                    <circle cx="9" cy="6" r="1.8"/><circle cx="15" cy="6" r="1.8"/>
+                                    <circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/>
+                                    <circle cx="9" cy="18" r="1.8"/><circle cx="15" cy="18" r="1.8"/>
+                                </svg>
+                            </div>
+
+                            <!-- Font Family Dropdown -->
+                            <select id="text-font-family" class="text-tb-select" title="Font Family">
+                                <option value="Inter, sans-serif">Inter (Modern Clean)</option>
+                                <option value="'JetBrains Mono', monospace">JetBrains Mono (Code)</option>
+                                <option value="Georgia, serif">Georgia (Serif)</option>
+                                <option value="'Comic Sans MS', cursive, sans-serif">Comic / Playful</option>
+                                <option value="Impact, sans-serif">Impact / Bold</option>
+                            </select>
+
+                            <!-- Font Size Selector -->
+                            <div class="text-tb-group">
+                                <button class="text-tb-btn" id="btn-text-size-down" title="Decrease font size">-</button>
+                                <span id="text-size-val" class="text-tb-label">28px</span>
+                                <button class="text-tb-btn" id="btn-text-size-up" title="Increase font size">+</button>
+                            </div>
+
+                            <!-- Box Shape Style Chips -->
+                            <div class="text-tb-group" title="Box Shape Container Style">
+                                <button class="text-style-chip active" data-style="glass" title="Glassmorphism Card">Glass</button>
+                                <button class="text-style-chip" data-style="neon" title="Neon Glow Border">Neon</button>
+                                <button class="text-style-chip" data-style="solid" title="Solid Card">Solid</button>
+                                <button class="text-style-chip" data-style="clean" title="Clean Minimal Outline">Clean</button>
+                                <button class="text-style-chip" data-style="none" title="No Box (Transparent)">None</button>
+                            </div>
+
+                            <!-- Auto-Margin Detection Badge -->
+                            <div class="auto-margin-badge" id="auto-margin-badge" title="Auto-detected balanced padding between text and border">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                                <span id="margin-metric-text">Auto Margin: 20×15px</span>
+                            </div>
+
+                            <!-- Actions -->
+                            <button class="text-tb-action-btn delete-btn" id="btn-text-delete" title="Delete Text Box (Delete / Backspace)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            </button>
+                            <button class="text-tb-action-btn done-btn" id="btn-text-done" title="Commit Text Box (Enter or Click Outside)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                <span>Done</span>
+                            </button>
+                        </div>
+
+                        <!-- The Dynamic Moveable & Resizable Box Shape Container -->
+                        <div class="smart-text-card box-style-glass" id="smart-text-card">
+                            <!-- Drag Header Bar for repositioning -->
+                            <div class="smart-text-drag-bar" id="smart-text-drag-bar" title="Drag to move text box anywhere">
+                                <div class="drag-bar-grip">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                        <circle cx="9" cy="6" r="1.8"/><circle cx="15" cy="6" r="1.8"/>
+                                        <circle cx="9" cy="12" r="1.8"/><circle cx="15" cy="12" r="1.8"/>
+                                        <circle cx="9" cy="18" r="1.8"/><circle cx="15" cy="18" r="1.8"/>
+                                    </svg>
+                                    <span class="drag-bar-label">Move</span>
+                                </div>
+                                <div class="drag-bar-size-badge" id="drag-bar-size-badge">240×80</div>
+                            </div>
+
+                            <!-- Contenteditable text area -->
+                            <div class="smart-text-editable" id="smart-text-input" contenteditable="true" spellcheck="false" data-placeholder="Type text here..."></div>
+
+                            <!-- 4 Corner Handles (Diagonal Resizing) -->
+                            <div class="card-handle corner-handle top-left" data-handle="top-left" title="Resize corner (Hold Shift to lock aspect)"></div>
+                            <div class="card-handle corner-handle top-right" data-handle="top-right" title="Resize corner (Hold Shift to lock aspect)"></div>
+                            <div class="card-handle corner-handle bottom-left" data-handle="bottom-left" title="Resize corner (Hold Shift to lock aspect)"></div>
+                            <div class="card-handle corner-handle bottom-right" data-handle="bottom-right" title="Resize corner (Hold Shift to lock aspect)"></div>
+
+                            <!-- 4 Edge Handles (Directional Resizing) -->
+                            <div class="card-handle edge-handle edge-left" data-handle="edge-left" title="Adjust box width"></div>
+                            <div class="card-handle edge-handle edge-right" data-handle="edge-right" title="Adjust box width"></div>
+                            <div class="card-handle edge-handle edge-top" data-handle="edge-top" title="Adjust box height"></div>
+                            <div class="card-handle edge-handle edge-bottom" data-handle="edge-bottom" title="Adjust box height"></div>
+                        </div>
                     </div>
 
                     <!-- Drag and Drop Overlay for Image Import -->

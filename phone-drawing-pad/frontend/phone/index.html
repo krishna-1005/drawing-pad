@@ -95,6 +95,34 @@
                 <span id="zoom-text">100%</span>
                 <span class="zoom-reset-label">Fit</span>
             </button>
+
+            <!-- Mobile Smart Text Box Live Interactive Overlay -->
+            <div id="phone-text-overlay" class="phone-text-overlay hidden">
+                <div class="phone-text-toolbar" id="phone-text-toolbar">
+                    <button class="phone-text-tb-btn" id="btn-phone-text-size-down">-</button>
+                    <span id="phone-text-size-val" class="phone-text-size-val">22px</span>
+                    <button class="phone-text-tb-btn" id="btn-phone-text-size-up">+</button>
+                    <div class="phone-text-styles-group">
+                        <button class="phone-text-style-chip active" data-style="glass">Glass</button>
+                        <button class="phone-text-style-chip" data-style="neon">Neon</button>
+                        <button class="phone-text-style-chip" data-style="solid">Solid</button>
+                        <button class="phone-text-style-chip" data-style="clean">Clean</button>
+                    </div>
+                    <button class="phone-text-action-btn delete-btn" id="btn-phone-text-del" title="Delete">✕</button>
+                    <button class="phone-text-action-btn done-btn" id="btn-phone-text-done" title="Done">✓</button>
+                </div>
+                <div class="phone-text-card box-style-glass" id="phone-text-card">
+                    <div class="phone-text-drag-bar" id="phone-text-drag-bar" title="Drag to move text box">
+                        <span class="phone-drag-grip">⠿ Move</span>
+                        <span class="phone-size-badge" id="phone-size-badge">Auto</span>
+                    </div>
+                    <div class="phone-text-editable" id="phone-text-input" contenteditable="true" spellcheck="false" data-placeholder="Type text..."></div>
+                    <div class="phone-card-handle top-left" data-handle="top-left"></div>
+                    <div class="phone-card-handle top-right" data-handle="top-right"></div>
+                    <div class="phone-card-handle bottom-left" data-handle="bottom-left"></div>
+                    <div class="phone-card-handle bottom-right" data-handle="bottom-right"></div>
+                </div>
+            </div>
         </main>
 
         <!-- ============ FLOATING MOBILE STUDIO DOCK ============ -->
@@ -312,6 +340,15 @@
                             </svg>
                         </span>
                         <span id="phone-shape-text">Circle</span>
+                    </button>
+                    <!-- Text Button -->
+                    <button class="brush-btn text-btn" data-brush="text" id="btn-phone-text" title="Smart Text Box">
+                        <svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="4 7 4 4 20 4 20 7"/>
+                            <line x1="9" y1="20" x2="15" y2="20"/>
+                            <line x1="12" y1="4" x2="12" y2="20"/>
+                        </svg>
+                        <span>Text</span>
                     </button>
                 </div>
 

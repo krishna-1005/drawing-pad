@@ -1124,3 +1124,231 @@ input[type="range"]::-webkit-slider-thumb:active {
     border-color: rgba(6, 182, 212, 0.4);
     box-shadow: 0 4px 14px rgba(6, 182, 212, 0.35);
 }
+
+.brush-btn.text-btn.active {
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    border-color: rgba(99, 102, 241, 0.4);
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+/* Mobile Smart Text Box Live Interactive Overlay */
+.phone-text-overlay {
+    position: absolute;
+    z-index: 120;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+    max-width: 92vw;
+    animation: phoneTextPop 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes phoneTextPop {
+    from { opacity: 0; transform: scale(0.95); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+.phone-text-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 8px;
+    background: rgba(14, 18, 30, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+}
+
+.phone-text-tb-btn {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border: none;
+    color: #ffffff;
+    font-weight: 700;
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.phone-text-size-val {
+    font-size: 0.72rem;
+    font-family: var(--font-mono);
+    color: #ffffff;
+    font-weight: 600;
+    min-width: 32px;
+    text-align: center;
+}
+
+.phone-text-styles-group {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    margin: 0 3px;
+}
+
+.phone-text-style-chip {
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 5px;
+    color: var(--text-dim);
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 3px 5px;
+}
+
+.phone-text-style-chip.active {
+    background: rgba(99, 102, 241, 0.25);
+    border-color: #6366f1;
+    color: #ffffff;
+}
+
+.phone-text-action-btn {
+    border: none;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.phone-text-action-btn.delete-btn {
+    background: rgba(244, 63, 94, 0.18);
+    color: #f43f5e;
+}
+
+.phone-text-action-btn.done-btn {
+    background: #6366f1;
+    color: #ffffff;
+}
+
+/* Mobile Smart Text Moveable & Resizable Card Shape */
+.phone-text-card {
+    display: inline-block;
+    min-width: 100px;
+    max-width: 86vw;
+    width: max-content;
+    box-sizing: border-box;
+    position: relative;
+    cursor: text;
+    user-select: text;
+    transition: all 0.15s ease;
+}
+
+.phone-text-card.is-moving {
+    box-shadow: 0 16px 36px rgba(0, 0, 0, 0.7), 0 0 24px rgba(99, 102, 241, 0.5) !important;
+    transition: none !important;
+}
+
+.phone-text-card.is-resizing {
+    outline: 1.5px dashed rgba(99, 102, 241, 0.85);
+    outline-offset: 2px;
+    transition: none !important;
+}
+
+/* Mobile Drag Header Bar */
+.phone-text-drag-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    margin-bottom: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px dashed rgba(255, 255, 255, 0.16);
+    user-select: none;
+    touch-action: none;
+    cursor: grab;
+}
+
+.phone-text-drag-bar:active, .phone-text-drag-bar.is-dragging {
+    background: rgba(99, 102, 241, 0.35);
+    border-color: #6366f1;
+    cursor: grabbing;
+}
+
+.phone-drag-grip {
+    font-size: 0.65rem;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+.phone-size-badge {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.5);
+}
+
+.phone-text-card.box-style-glass {
+    background: rgba(18, 24, 38, 0.88);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1.5px solid rgba(99, 102, 241, 0.55);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.phone-text-card.box-style-neon {
+    background: rgba(12, 15, 26, 0.94);
+    border: 2px solid #6366f1;
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+}
+
+.phone-text-card.box-style-solid {
+    background: #1e2337;
+    border: 1.5px solid #3b4261;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.phone-text-card.box-style-clean {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1.5px solid rgba(255, 255, 255, 0.3);
+}
+
+.phone-text-editable {
+    min-width: 50px;
+    outline: none;
+    white-space: pre-wrap;
+    word-break: break-word;
+    display: inline-block;
+    width: 100%;
+    box-sizing: border-box;
+    color: #ffffff;
+    font-weight: 500;
+}
+
+.phone-text-editable:empty::before {
+    content: attr(data-placeholder);
+    color: rgba(255, 255, 255, 0.36);
+}
+
+/* Mobile Corner Resize Handles */
+.phone-card-handle {
+    position: absolute;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #ffffff;
+    border: 2px solid #6366f1;
+    box-shadow: 0 0 8px rgba(99, 102, 241, 0.9);
+    touch-action: none;
+    z-index: 25;
+}
+
+.phone-card-handle::after {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -10px;
+    right: -10px;
+    bottom: -10px;
+}
+
+.phone-card-handle.top-left     { top: -6px; left: -6px; }
+.phone-card-handle.top-right    { top: -6px; right: -6px; }
+.phone-card-handle.bottom-left  { bottom: -6px; left: -6px; }
+.phone-card-handle.bottom-right { bottom: -6px; right: -6px; }
+

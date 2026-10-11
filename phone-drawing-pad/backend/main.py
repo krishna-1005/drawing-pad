@@ -243,8 +243,9 @@ manager = ConnectionManager()
 
 # Basic WebSocket validation helpers
 HEX_COLOR_REGEX = re.compile(r"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
-VALID_BRUSHES = {"pen", "pencil", "marker", "soft", "airbrush", "eraser", "bucket", "shape"}
+VALID_BRUSHES = {"pen", "pencil", "marker", "soft", "airbrush", "eraser", "bucket", "shape", "text"}
 VALID_SHAPES = {"circle", "rectangle", "line", "arrow", "triangle", "star", "diamond"}
+VALID_BOX_STYLES = {"glass", "neon", "solid", "clean", "none"}
 VALID_SMOOTHING = {"off", "low", "medium", "high"}
 
 def validate_stroke_event(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -260,10 +261,51 @@ def validate_stroke_event(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         "stroke_start", "stroke_points", "stroke", "stroke_end", 
         "undo", "redo", "clear", "sync_history", "ping", "client",
         "import_image", "clear_image", "tool_update", "pointer_hover",
-        "fill", "shape_preview"
+        "fill", "shape_preview", "text_element"
     }
     if event_type not in valid_types:
         return None
+
+    # Handle text element creation and update
+    if event_type == "text_element":
+        raw_text = str(data.get("text", "")).strip()
+        if not raw_text:
+            return None
+        stroke_id = str(data.get("stroke_id", f"txt_{int(data.get('timestamp', 0))}"))
+        x = max(-0.5, min(1.5, float(data.get("x", 0.0))))
+        y = max(-0.5, min(1.5, float(data.get("y", 0.0))))
+        font_size = max(8.0, min(200.0, float(data.get("font_size", 24.0))))
+        font_family = str(data.get("font_family", "Inter, sans-serif"))
+        color = str(data.get("color", "#ffffff"))
+        if not HEX_COLOR_REGEX.match(color):
+            color = "#ffffff"
+        box_style = str(data.get("box_style", "glass"))
+        if box_style not in VALID_BOX_STYLES:
+            box_style = "glass"
+        box_width = max(10.0, float(data.get("box_width", 200.0)))
+        box_height = max(10.0, float(data.get("box_height", 80.0)))
+        box_padding_x = max(0.0, float(data.get("box_padding_x", 18.0)))
+        box_padding_y = max(0.0, float(data.get("box_padding_y", 14.0)))
+        border_radius = max(0.0, float(data.get("border_radius", 14.0)))
+        layer_id = str(data.get("layerId", "layer-2"))
+        return {
+            "type": "text_element",
+            "stroke_id": stroke_id,
+            "text": raw_text[:5000],
+            "x": round(x, 6),
+            "y": round(y, 6),
+            "font_size": round(font_size, 2),
+            "font_family": font_family,
+            "color": color,
+            "box_style": box_style,
+            "box_width": round(box_width, 2),
+            "box_height": round(box_height, 2),
+            "box_padding_x": round(box_padding_x, 2),
+            "box_padding_y": round(box_padding_y, 2),
+            "border_radius": round(border_radius, 2),
+            "layerId": layer_id,
+            "timestamp": data.get("timestamp")
+        }
 
     # Handle live interactive shape preview streaming
     if event_type == "shape_preview":

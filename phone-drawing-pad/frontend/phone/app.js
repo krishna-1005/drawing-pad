@@ -366,6 +366,13 @@
             return;
         }
 
+        // Check if text tool is active
+        if (currentBrush === 'text') {
+            const pt = getNormPoint(e);
+            handlePhoneTextTap(pt);
+            return;
+        }
+
         isDrawing = true;
         redoHistory = [];
 
@@ -623,8 +630,9 @@
         if (e.pointerType === 'mouse') onPointerUp(e);
     }, { passive: false });
 
-    // Prevent default touch behaviour that could scroll the page
+    // Prevent default touch behaviour that could scroll the page or delay pointer events
     viewport.addEventListener('touchstart', e => { if (e.touches.length === 1) e.preventDefault(); }, { passive: false });
+    viewport.addEventListener('touchmove', e => { if (e.touches.length === 1) e.preventDefault(); }, { passive: false });
 
     // ================================================================
     //  3. BRUSH ENGINE  — 6 distinct renderers
@@ -821,6 +829,7 @@
 
         // 5. Draw completed and in-progress strokes
         for (const stroke of strokeHistory) {
+            if (stroke === phoneEditingTextStroke) continue; // Hide underlying stroke while editor is open
             renderComplete(stroke);
         }
         if (currentStroke && currentStroke.points.length > 0) {
@@ -855,6 +864,11 @@
         if (!stroke) return;
         const mapping = getPhoneArtboardMapping();
 
+        if (stroke.isText) {
+            renderPhoneTextStroke(stroke, mapping);
+            return;
+        }
+
         if (stroke.isFill && stroke.fillCanvas && stroke.normBounds) {
             ctx.save();
             ctx.globalAlpha = stroke.opacity !== undefined ? stroke.opacity : 1.0;
@@ -888,6 +902,578 @@
         };
 
         BrushEngine.dispatch(scaledStroke, pxPts);
+    }
+
+    // ================================================================
+    //  PHONE SMART TEXT BOX ENGINE
+    // ================================================================
+    let phoneTextFontSize = 24;
+    let phoneTextBoxStyle = 'glass';
+    let phoneEditingTextStroke = null;
+    let phoneTextNormPos = null;
+
+    let customPhoneBoxWidth = null;
+    let customPhoneBoxHeight = null;
+    let isMovingPhoneCard = false;
+    let isResizingPhoneCard = false;
+
+    const phoneTextOverlay = document.getElementById('phone-text-overlay');
+    const phoneTextToolbar = document.getElementById('phone-text-toolbar');
+    const phoneTextCard = document.getElementById('phone-text-card');
+    const phoneTextDragBar = document.getElementById('phone-text-drag-bar');
+    const phoneSizeBadge = document.getElementById('phone-size-badge');
+    const phoneTextInput = document.getElementById('phone-text-input');
+    const btnPhoneTextSizeDown = document.getElementById('btn-phone-text-size-down');
+    const btnPhoneTextSizeUp = document.getElementById('btn-phone-text-size-up');
+    const phoneTextSizeVal = document.getElementById('phone-text-size-val');
+    const phoneTextStyleChips = document.querySelectorAll('.phone-text-style-chip');
+    const btnPhoneTextDel = document.getElementById('btn-phone-text-del');
+    const btnPhoneTextDone = document.getElementById('btn-phone-text-done');
+
+    function renderPhoneTextStroke(stroke, mapping) {
+        if (!stroke.text) return;
+        ctx.save();
+        ctx.globalAlpha = stroke.opacity !== undefined ? stroke.opacity : 1.0;
+
+        const scaleFactor = mapping.artW / 600;
+        const fontSize = Math.max(8, (stroke.fontSize || 22) * scaleFactor);
+        const fontFamily = stroke.fontFamily || 'Inter, sans-serif';
+        ctx.font = `${fontSize}px ${fontFamily}`;
+        ctx.textBaseline = 'top';
+
+        const paddingX = (stroke.boxPaddingX || 16) * scaleFactor;
+        const paddingY = (stroke.boxPaddingY || 12) * scaleFactor;
+        const radius = (stroke.borderRadius || 12) * scaleFactor;
+        const lineHeight = fontSize * 1.35;
+
+        let targetBoxW = stroke.boxWidth ? stroke.boxWidth * scaleFactor : 0;
+        let targetBoxH = stroke.boxHeight ? stroke.boxHeight * scaleFactor : 0;
+
+        // Auto word-wrap if width constrained
+        const rawLines = String(stroke.text || '').split('\n');
+        const lines = [];
+        const maxLineWidth = targetBoxW > 0 ? Math.max(30 * scaleFactor, targetBoxW - paddingX * 2) : 100000;
+
+        for (const rawLine of rawLines) {
+            if (!rawLine) {
+                lines.push('');
+                continue;
+            }
+            if (targetBoxW > 0 && ctx.measureText(rawLine).width > maxLineWidth) {
+                const words = rawLine.split(' ');
+                let curLine = words[0];
+                for (let w = 1; w < words.length; w++) {
+                    const testLine = curLine + ' ' + words[w];
+                    if (ctx.measureText(testLine).width <= maxLineWidth) {
+                        curLine = testLine;
+                    } else {
+                        lines.push(curLine);
+                        curLine = words[w];
+                    }
+                }
+                lines.push(curLine);
+            } else {
+                lines.push(rawLine);
+            }
+        }
+
+        let maxTextW = 0;
+        for (const line of lines) {
+            const w = ctx.measureText(line).width;
+            if (w > maxTextW) maxTextW = w;
+        }
+
+        const totalTextH = lines.length * lineHeight;
+        const boxW = Math.max(targetBoxW || (70 * scaleFactor), maxTextW + paddingX * 2);
+        const boxH = Math.max(targetBoxH || (30 * scaleFactor), totalTextH + paddingY * 2);
+
+        const boxX = mapping.artX + stroke.x * mapping.artW;
+        const boxY = mapping.artY + stroke.y * mapping.artH;
+
+        stroke.normBounds = {
+            x: stroke.x,
+            y: stroke.y,
+            w: boxW / mapping.artW,
+            h: boxH / mapping.artH
+        };
+
+        const boxStyle = stroke.boxStyle || 'glass';
+        if (boxStyle !== 'none') {
+            ctx.beginPath();
+            if (ctx.roundRect) {
+                ctx.roundRect(boxX, boxY, boxW, boxH, radius);
+            } else {
+                ctx.rect(boxX, boxY, boxW, boxH);
+            }
+
+            if (boxStyle === 'glass') {
+                ctx.fillStyle = 'rgba(18, 24, 38, 0.88)';
+                ctx.fill();
+                ctx.lineWidth = Math.max(1, 1.5 * scaleFactor);
+                ctx.strokeStyle = 'rgba(99, 102, 241, 0.55)';
+                ctx.stroke();
+            } else if (boxStyle === 'neon') {
+                ctx.fillStyle = 'rgba(12, 15, 26, 0.94)';
+                ctx.fill();
+                ctx.lineWidth = Math.max(1.5, 2 * scaleFactor);
+                ctx.strokeStyle = stroke.color || '#6366f1';
+                ctx.shadowColor = stroke.color || '#6366f1';
+                ctx.shadowBlur = 12 * scaleFactor;
+                ctx.stroke();
+                ctx.shadowColor = 'transparent';
+            } else if (boxStyle === 'solid') {
+                ctx.fillStyle = '#1e2337';
+                ctx.fill();
+                ctx.lineWidth = Math.max(1, 1.5 * scaleFactor);
+                ctx.strokeStyle = '#3b4261';
+                ctx.stroke();
+            } else if (boxStyle === 'clean') {
+                ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+                ctx.fill();
+                ctx.lineWidth = Math.max(1, 1.5 * scaleFactor);
+                ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+                ctx.stroke();
+            }
+        }
+
+        ctx.fillStyle = stroke.color || '#ffffff';
+        for (let i = 0; i < lines.length; i++) {
+            const lineX = boxX + paddingX;
+            const lineY = boxY + paddingY + i * lineHeight;
+            ctx.fillText(lines[i], lineX, lineY);
+        }
+
+        ctx.restore();
+    }
+
+    function findPhoneTextStrokeAt(normX, normY) {
+        const mapping = getPhoneArtboardMapping();
+        for (let i = strokeHistory.length - 1; i >= 0; i--) {
+            const s = strokeHistory[i];
+            if (!s.isText) continue;
+            if (!s.normBounds) {
+                const scaleFactor = mapping.artW / 600;
+                const approxW = Math.max(70 * scaleFactor, (s.boxWidth || 180) * scaleFactor);
+                const approxH = Math.max(30 * scaleFactor, (s.boxHeight || 60) * scaleFactor);
+                s.normBounds = {
+                    x: s.x,
+                    y: s.y,
+                    w: approxW / mapping.artW,
+                    h: approxH / mapping.artH
+                };
+            }
+            const b = s.normBounds;
+            if (normX >= b.x && normX <= b.x + b.w && normY >= b.y && normY <= b.y + b.h) {
+                return { stroke: s, index: i };
+            }
+        }
+        return null;
+    }
+
+    function handlePhoneTextTap(pt) {
+        if (phoneTextOverlay && !phoneTextOverlay.classList.contains('hidden')) {
+            commitPhoneText();
+            return;
+        }
+
+        const hit = findPhoneTextStrokeAt(pt.x, pt.y);
+        if (hit) {
+            openPhoneTextEditor(hit.stroke.x, hit.stroke.y, hit.stroke);
+        } else {
+            openPhoneTextEditor(pt.x, pt.y, null);
+        }
+    }
+
+    function updatePhoneSmartBoxDimensions(preserveCustomSize = true) {
+        if (!phoneTextInput || !phoneTextCard) return;
+
+        phoneTextInput.style.fontSize = `${phoneTextFontSize}px`;
+        phoneTextInput.style.color = currentColor;
+        if (phoneTextSizeVal) phoneTextSizeVal.textContent = `${phoneTextFontSize}px`;
+
+        const padX = Math.round(Math.max(14, phoneTextFontSize * 0.72));
+        const padY = Math.round(Math.max(10, phoneTextFontSize * 0.52));
+        const radius = Math.round(Math.max(10, phoneTextFontSize * 0.42));
+
+        phoneTextCard.style.padding = `${padY}px ${padX}px`;
+        phoneTextCard.style.borderRadius = `${radius}px`;
+        phoneTextCard.className = `phone-text-card box-style-${phoneTextBoxStyle}`;
+
+        if (preserveCustomSize && customPhoneBoxWidth) {
+            phoneTextCard.style.width = `${customPhoneBoxWidth}px`;
+        } else if (!preserveCustomSize) {
+            customPhoneBoxWidth = null;
+            phoneTextCard.style.width = 'max-content';
+        }
+
+        if (preserveCustomSize && customPhoneBoxHeight) {
+            phoneTextCard.style.minHeight = `${customPhoneBoxHeight}px`;
+        } else if (!preserveCustomSize) {
+            customPhoneBoxHeight = null;
+            phoneTextCard.style.minHeight = 'auto';
+        }
+
+        const curW = Math.round(customPhoneBoxWidth || phoneTextCard.offsetWidth || 120);
+        const curH = Math.round(customPhoneBoxHeight || phoneTextCard.offsetHeight || 50);
+        if (phoneSizeBadge) {
+            phoneSizeBadge.textContent = `${curW}×${curH}`;
+        }
+
+        if (phoneTextBoxStyle === 'neon') {
+            phoneTextCard.style.borderColor = currentColor;
+            phoneTextCard.style.boxShadow = `0 0 20px ${currentColor}88`;
+        } else {
+            phoneTextCard.style.borderColor = '';
+            phoneTextCard.style.boxShadow = '';
+        }
+    }
+
+    function openPhoneTextEditor(normX, normY, existingStroke) {
+        if (!phoneTextOverlay) return;
+
+        phoneTextNormPos = { x: Math.max(0, Math.min(0.85, normX)), y: Math.max(0, Math.min(0.85, normY)) };
+        phoneEditingTextStroke = existingStroke || null;
+
+        if (existingStroke) {
+            phoneTextInput.innerText = existingStroke.text || '';
+            phoneTextFontSize = existingStroke.fontSize || 24;
+            phoneTextBoxStyle = existingStroke.boxStyle || 'glass';
+            customPhoneBoxWidth = existingStroke.boxWidth || null;
+            customPhoneBoxHeight = existingStroke.boxHeight || null;
+            if (existingStroke.color) currentColor = existingStroke.color;
+        } else {
+            phoneTextInput.innerText = '';
+            customPhoneBoxWidth = null;
+            customPhoneBoxHeight = null;
+        }
+
+        if (phoneTextStyleChips) {
+            phoneTextStyleChips.forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.style === phoneTextBoxStyle);
+            });
+        }
+
+        updatePhoneSmartBoxDimensions(true);
+
+        const mapping = getPhoneArtboardMapping();
+        const px = mapping.artX + phoneTextNormPos.x * mapping.artW;
+        const py = mapping.artY + phoneTextNormPos.y * mapping.artH;
+
+        phoneTextOverlay.style.left = `${Math.max(10, Math.min(window.innerWidth - 200, px))}px`;
+        phoneTextOverlay.style.top = `${Math.max(10, Math.min(window.innerHeight - 140, py))}px`;
+
+        phoneTextOverlay.classList.remove('hidden');
+        redrawAll();
+
+        setTimeout(() => {
+            if (phoneTextInput) {
+                phoneTextInput.focus();
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(phoneTextInput);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        }, 60);
+    }
+
+    function commitPhoneText() {
+        if (!phoneTextOverlay || phoneTextOverlay.classList.contains('hidden')) return;
+
+        const rawText = (phoneTextInput ? phoneTextInput.innerText : '').trim();
+
+        if (!rawText) {
+            if (phoneEditingTextStroke) {
+                const idx = strokeHistory.indexOf(phoneEditingTextStroke);
+                if (idx !== -1) strokeHistory.splice(idx, 1);
+            }
+            closePhoneTextEditor();
+            return;
+        }
+
+        const mapping = getPhoneArtboardMapping();
+        const scaleFactor = mapping.artW / 600;
+        const fontSize = Math.max(8, phoneTextFontSize * scaleFactor);
+        ctx.font = `${fontSize}px Inter, sans-serif`;
+
+        const lines = rawText.split('\n');
+        let maxTextW = 0;
+        for (const line of lines) {
+            const w = ctx.measureText(line).width;
+            if (w > maxTextW) maxTextW = w;
+        }
+
+        const padX = Math.round(Math.max(16, phoneTextFontSize * 0.72));
+        const padY = Math.round(Math.max(12, phoneTextFontSize * 0.52));
+        const radius = Math.round(Math.max(10, phoneTextFontSize * 0.42));
+        const lineHeight = fontSize * 1.35;
+        const totalTextH = lines.length * lineHeight;
+
+        const calculatedW = Math.max(80, Math.round((maxTextW / scaleFactor) + padX * 2));
+        const calculatedH = Math.max(34, Math.round((totalTextH / scaleFactor) + padY * 2));
+
+        const boxW = customPhoneBoxWidth ? Math.max(customPhoneBoxWidth, calculatedW) : calculatedW;
+        const boxH = customPhoneBoxHeight ? Math.max(customPhoneBoxHeight, calculatedH) : calculatedH;
+
+        const stroke = phoneEditingTextStroke || {
+            stroke_id: `txt_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+            isText: true
+        };
+
+        stroke.isText = true;
+        stroke.text = rawText;
+        stroke.x = phoneTextNormPos ? phoneTextNormPos.x : 0.2;
+        stroke.y = phoneTextNormPos ? phoneTextNormPos.y : 0.3;
+        stroke.fontSize = phoneTextFontSize;
+        stroke.fontFamily = 'Inter, sans-serif';
+        stroke.color = currentColor;
+        stroke.boxStyle = phoneTextBoxStyle;
+        stroke.boxPaddingX = padX;
+        stroke.boxPaddingY = padY;
+        stroke.borderRadius = radius;
+        stroke.boxWidth = boxW;
+        stroke.boxHeight = boxH;
+        stroke.normBounds = {
+            x: stroke.x,
+            y: stroke.y,
+            w: (boxW * scaleFactor) / mapping.artW,
+            h: (boxH * scaleFactor) / mapping.artH
+        };
+
+        if (!strokeHistory.includes(stroke)) {
+            strokeHistory.push(stroke);
+        }
+        redoHistory = [];
+
+        wsSend({
+            type: 'text_element',
+            stroke_id: stroke.stroke_id,
+            text: stroke.text,
+            x: stroke.x,
+            y: stroke.y,
+            font_size: stroke.fontSize,
+            font_family: stroke.fontFamily,
+            color: stroke.color,
+            box_style: stroke.boxStyle,
+            box_width: stroke.boxWidth,
+            box_height: stroke.boxHeight,
+            box_padding_x: stroke.boxPaddingX,
+            box_padding_y: stroke.boxPaddingY,
+            border_radius: stroke.borderRadius,
+            timestamp: Date.now()
+        });
+
+        closePhoneTextEditor();
+    }
+
+    function deletePhoneText() {
+        if (phoneEditingTextStroke) {
+            const idx = strokeHistory.indexOf(phoneEditingTextStroke);
+            if (idx !== -1) {
+                strokeHistory.splice(idx, 1);
+            }
+        }
+        closePhoneTextEditor();
+    }
+
+    function closePhoneTextEditor() {
+        if (!phoneTextOverlay) return;
+        phoneTextOverlay.classList.add('hidden');
+        phoneEditingTextStroke = null;
+        customPhoneBoxWidth = null;
+        customPhoneBoxHeight = null;
+        redrawAll();
+    }
+
+    function initPhoneTextEngine() {
+        if (!phoneTextInput) return;
+
+        phoneTextInput.addEventListener('input', () => {
+            updatePhoneSmartBoxDimensions(true);
+        });
+
+        if (btnPhoneTextSizeDown) {
+            btnPhoneTextSizeDown.addEventListener('click', (e) => {
+                e.stopPropagation();
+                phoneTextFontSize = Math.max(12, phoneTextFontSize - 4);
+                updatePhoneSmartBoxDimensions(true);
+            });
+        }
+
+        if (btnPhoneTextSizeUp) {
+            btnPhoneTextSizeUp.addEventListener('click', (e) => {
+                e.stopPropagation();
+                phoneTextFontSize = Math.min(80, phoneTextFontSize + 4);
+                updatePhoneSmartBoxDimensions(true);
+            });
+        }
+
+        phoneTextStyleChips.forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                e.stopPropagation();
+                phoneTextStyleChips.forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                phoneTextBoxStyle = chip.dataset.style;
+                updatePhoneSmartBoxDimensions(true);
+            });
+        });
+
+        if (btnPhoneTextDel) {
+            btnPhoneTextDel.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deletePhoneText();
+            });
+        }
+
+        if (btnPhoneTextDone) {
+            btnPhoneTextDone.addEventListener('click', (e) => {
+                e.stopPropagation();
+                commitPhoneText();
+            });
+        }
+
+        // Move handle for phone text card
+        function attachPhoneMoveHandler(elem) {
+            if (!elem) return;
+            elem.addEventListener('pointerdown', (e) => {
+                if (e.target === phoneTextInput || e.target.closest('.phone-card-handle') || e.target.closest('.phone-text-tb-btn') || e.target.closest('.phone-text-style-chip')) return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                isMovingPhoneCard = true;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startLeft = parseFloat(phoneTextOverlay.style.left) || 0;
+                const startTop = parseFloat(phoneTextOverlay.style.top) || 0;
+
+                elem.classList.add('is-dragging');
+                if (phoneTextCard) phoneTextCard.classList.add('is-moving');
+
+                try { elem.setPointerCapture(e.pointerId); } catch(err) {}
+
+                const onMove = (ev) => {
+                    if (!isMovingPhoneCard) return;
+                    const dx = ev.clientX - startX;
+                    const dy = ev.clientY - startY;
+
+                    const maxL = Math.max(10, window.innerWidth - 60);
+                    const maxT = Math.max(10, window.innerHeight - 60);
+                    const newLeft = Math.max(4, Math.min(maxL, startLeft + dx));
+                    const newTop = Math.max(4, Math.min(maxT, startTop + dy));
+
+                    phoneTextOverlay.style.left = `${newLeft}px`;
+                    phoneTextOverlay.style.top = `${newTop}px`;
+
+                    const mapping = getPhoneArtboardMapping();
+                    phoneTextNormPos = {
+                        x: Math.max(0, Math.min(1.0, (newLeft - mapping.artX) / mapping.artW)),
+                        y: Math.max(0, Math.min(1.0, (newTop - mapping.artY) / mapping.artH))
+                    };
+                };
+
+                const onUp = (ev) => {
+                    isMovingPhoneCard = false;
+                    elem.classList.remove('is-dragging');
+                    if (phoneTextCard) phoneTextCard.classList.remove('is-moving');
+                    try { elem.releasePointerCapture(ev.pointerId); } catch(err) {}
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                    window.removeEventListener('pointercancel', onUp);
+                };
+
+                window.addEventListener('pointermove', onMove);
+                window.addEventListener('pointerup', onUp);
+                window.addEventListener('pointercancel', onUp);
+            });
+        }
+
+        attachPhoneMoveHandler(phoneTextDragBar);
+        attachPhoneMoveHandler(phoneTextCard);
+
+        // Resize handles for phone text card
+        const phoneHandles = phoneTextCard ? phoneTextCard.querySelectorAll('.phone-card-handle') : [];
+        phoneHandles.forEach(h => {
+            h.addEventListener('pointerdown', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                isResizingPhoneCard = true;
+                const handleType = h.dataset.handle;
+                const startX = e.clientX;
+                const startY = e.clientY;
+                const startW = phoneTextCard.offsetWidth;
+                const startH = phoneTextCard.offsetHeight;
+                const startLeft = parseFloat(phoneTextOverlay.style.left) || 0;
+                const startTop = parseFloat(phoneTextOverlay.style.top) || 0;
+
+                phoneTextCard.classList.add('is-resizing');
+                try { h.setPointerCapture(e.pointerId); } catch(err) {}
+
+                const onMove = (ev) => {
+                    if (!isResizingPhoneCard) return;
+                    const dx = ev.clientX - startX;
+                    const dy = ev.clientY - startY;
+
+                    let newW = startW;
+                    let newH = startH;
+                    let newLeft = startLeft;
+                    let newTop = startTop;
+
+                    if (handleType === 'bottom-right') {
+                        newW = Math.max(70, startW + dx);
+                        newH = Math.max(30, startH + dy);
+                    } else if (handleType === 'bottom-left') {
+                        newW = Math.max(70, startW - dx);
+                        newH = Math.max(30, startH + dy);
+                        newLeft = startLeft + (startW - newW);
+                    } else if (handleType === 'top-right') {
+                        newW = Math.max(70, startW + dx);
+                        newH = Math.max(30, startH - dy);
+                        newTop = startTop + (startH - newH);
+                    } else if (handleType === 'top-left') {
+                        newW = Math.max(70, startW - dx);
+                        newH = Math.max(30, startH - dy);
+                        newLeft = startLeft + (startW - newW);
+                        newTop = startTop + (startH - newH);
+                    }
+
+                    customPhoneBoxWidth = Math.round(newW);
+                    customPhoneBoxHeight = Math.round(newH);
+
+                    phoneTextCard.style.width = `${customPhoneBoxWidth}px`;
+                    phoneTextCard.style.minHeight = `${customPhoneBoxHeight}px`;
+
+                    if (newLeft !== startLeft || newTop !== startTop) {
+                        phoneTextOverlay.style.left = `${newLeft}px`;
+                        phoneTextOverlay.style.top = `${newTop}px`;
+                        const mapping = getPhoneArtboardMapping();
+                        phoneTextNormPos = {
+                            x: Math.max(0, Math.min(1.0, (newLeft - mapping.artX) / mapping.artW)),
+                            y: Math.max(0, Math.min(1.0, (newTop - mapping.artY) / mapping.artH))
+                        };
+                    }
+
+                    updatePhoneSmartBoxDimensions(true);
+                };
+
+                const onUp = (ev) => {
+                    isResizingPhoneCard = false;
+                    phoneTextCard.classList.remove('is-resizing');
+                    try { h.releasePointerCapture(ev.pointerId); } catch(err) {}
+                    window.removeEventListener('pointermove', onMove);
+                    window.removeEventListener('pointerup', onUp);
+                    window.removeEventListener('pointercancel', onUp);
+                };
+
+                window.addEventListener('pointermove', onMove);
+                window.addEventListener('pointerup', onUp);
+                window.addEventListener('pointercancel', onUp);
+            });
+        });
+
+        if (phoneTextOverlay) {
+            phoneTextOverlay.addEventListener('pointerdown', (e) => e.stopPropagation());
+        }
     }
 
     let localRedrawScheduled = false;
@@ -1989,6 +2575,8 @@
                             highlightActiveSmoothing();
                         }
                         updateBrushPreview();
+                    } else if (m.type === 'text_element') {
+                        handleIncomingPhoneTextElement(m);
                     } else if (m.type === 'shape_preview') {
                         remotePhoneShapePreview = {
                             brush: 'pen',
@@ -2026,6 +2614,63 @@
         } catch(e) { scheduleReconn(); }
     }
 
+    function handleIncomingPhoneTextElement(data) {
+        const mapping = getPhoneArtboardMapping();
+        const scaleFactor = mapping.artW / 600;
+        const padX = data.box_padding_x || 16;
+        const padY = data.box_padding_y || 12;
+        const radius = data.border_radius || 12;
+        const boxW = data.box_width || 180;
+        const boxH = data.box_height || 60;
+
+        let existing = strokeHistory.find(s => s.stroke_id === data.stroke_id);
+        if (existing) {
+            existing.text = data.text;
+            existing.x = data.x;
+            existing.y = data.y;
+            existing.fontSize = data.font_size;
+            existing.fontFamily = data.font_family;
+            existing.color = data.color;
+            existing.boxStyle = data.box_style;
+            existing.boxPaddingX = padX;
+            existing.boxPaddingY = padY;
+            existing.borderRadius = radius;
+            existing.boxWidth = boxW;
+            existing.boxHeight = boxH;
+            existing.normBounds = {
+                x: data.x,
+                y: data.y,
+                w: (boxW * scaleFactor) / mapping.artW,
+                h: (boxH * scaleFactor) / mapping.artH
+            };
+        } else {
+            const newStroke = {
+                stroke_id: data.stroke_id,
+                isText: true,
+                text: data.text,
+                x: data.x,
+                y: data.y,
+                fontSize: data.font_size,
+                fontFamily: data.font_family,
+                color: data.color,
+                boxStyle: data.box_style,
+                boxPaddingX: padX,
+                boxPaddingY: padY,
+                borderRadius: radius,
+                boxWidth: boxW,
+                boxHeight: boxH,
+                normBounds: {
+                    x: data.x,
+                    y: data.y,
+                    w: (boxW * scaleFactor) / mapping.artW,
+                    h: (boxH * scaleFactor) / mapping.artH
+                }
+            };
+            strokeHistory.push(newStroke);
+        }
+        redrawAll();
+    }
+
     function scheduleReconn() {
         reconnAttempts++;
         setTimeout(() => { if (!wsConnected) connectWS(); },
@@ -2057,6 +2702,7 @@
     window.addEventListener('DOMContentLoaded', () => {
         setupCanvas();
         initUI();
+        initPhoneTextEngine();
         connectWS();
     });
 

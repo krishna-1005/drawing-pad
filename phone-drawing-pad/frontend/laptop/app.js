@@ -98,6 +98,25 @@
     const popoverActiveShapeName = document.getElementById('popover-active-shape-name');
     const shapesGrid = document.getElementById('shapes-grid');
 
+    // Smart Text Box Elements
+    const btnDockText = document.getElementById('btn-dock-text');
+    const smartTextOverlay = document.getElementById('smart-text-overlay');
+    const smartTextToolbar = document.getElementById('smart-text-toolbar');
+    const smartTextCard = document.getElementById('smart-text-card');
+    const smartTextDragBar = document.getElementById('smart-text-drag-bar');
+    const tbDragHandle = document.getElementById('tb-drag-handle');
+    const dragBarSizeBadge = document.getElementById('drag-bar-size-badge');
+    const smartTextInput = document.getElementById('smart-text-input');
+    const textFontFamily = document.getElementById('text-font-family');
+    const btnTextSizeDown = document.getElementById('btn-text-size-down');
+    const btnTextSizeUp = document.getElementById('btn-text-size-up');
+    const textSizeVal = document.getElementById('text-size-val');
+    const textStyleChips = document.querySelectorAll('.text-style-chip');
+    const autoMarginBadge = document.getElementById('auto-margin-badge');
+    const marginMetricText = document.getElementById('margin-metric-text');
+    const btnTextDelete = document.getElementById('btn-text-delete');
+    const btnTextDone = document.getElementById('btn-text-done');
+
     // Canvas HUD & Matrix
     const hudPhoneTool = document.getElementById('hud-phone-tool');
     const hudBrushSize = document.getElementById('hud-brush-size');
@@ -198,6 +217,8 @@
 
     // Stroke History & Aspect Ratio
     let strokeHistory = [];       // Array of completed strokes
+    window.strokeHistory = strokeHistory;
+    window.getStrokeHistory = () => strokeHistory;
     let redoHistory = [];         // Array of undone strokes
     let activeStrokesMap = new Map(); // stroke_id -> in-progress stroke
     let currentBgImage = null;
@@ -242,7 +263,8 @@
         'airbrush': 'Particle Airbrush',
         'eraser': 'Precision Eraser',
         'bucket': 'Paint Bucket Fill',
-        'shape': 'Shape'
+        'shape': 'Shape',
+        'text': 'Smart Text Box'
     };
 
     const SHAPE_SVGS = {
@@ -261,6 +283,13 @@
     let shapeCurrentNorm = null;
     let inProgressShapePts = null;
     let remoteShapePreview = null;
+
+    // Smart Text State
+    let activeTextFontSize = 28;
+    let activeTextFontFamily = 'Inter, sans-serif';
+    let activeTextBoxStyle = 'glass';
+    let editingTextStroke = null;
+    let textEditorNormPos = null;
 
     const SMOOTHING_DISPLAY_NAMES = {
         'off': 'Direct Raw (Direct)',
@@ -413,6 +442,7 @@
             committedCtx.globalAlpha = layer.opacity;
 
             for (const stroke of strokeHistory) {
+                if (stroke === editingTextStroke) continue; // Hide underlying stroke while live card editor is active
                 if (stroke.layerId === layer.id || (!stroke.layerId && layer.id === 'layer-2')) {
                     renderStroke(stroke, mapping, committedCtx);
                 }
@@ -444,7 +474,8 @@
                 ctx.globalAlpha = layer.opacity;
 
                 for (const stroke of activeStrokesMap.values()) {
-                    if (stroke.layerId === layer.id || (!stroke.layerId && layer.id === 'layer-2')) {
+                    const matchesLayer = stroke.layerId ? (stroke.layerId === layer.id) : (layer.id === (activeLayerId || 'layer-2'));
+                    if (matchesLayer) {
                         renderStroke(stroke, mapping, ctx);
                     }
                 }
@@ -506,7 +537,166 @@
         }
     }
 
+    // =========================================================================
+    // SMART TEXT BOX CANVAS RENDERING & HIT-TESTING
+    // =========================================================================
+    function renderTextStroke(stroke, mapping, targetCtx) {
+        if (!stroke.text) return;
+        targetCtx.save();
+        targetCtx.globalAlpha = stroke.opacity !== undefined ? stroke.opacity : 1.0;
+
+        const scaleFactor = mapping.targetWidth / 600;
+        const fontSize = Math.max(8, (stroke.fontSize || 28) * scaleFactor);
+        const fontFamily = stroke.fontFamily || 'Inter, sans-serif';
+        targetCtx.font = `${fontSize}px ${fontFamily}`;
+        targetCtx.textBaseline = 'top';
+
+        const paddingX = (stroke.boxPaddingX || 18) * scaleFactor;
+        const paddingY = (stroke.boxPaddingY || 14) * scaleFactor;
+        const radius = (stroke.borderRadius || 14) * scaleFactor;
+        const lineHeight = fontSize * 1.35;
+
+        // Custom box dimensions if user resized, else auto-measured
+        let targetBoxW = stroke.boxWidth ? stroke.boxWidth * scaleFactor : 0;
+        let targetBoxH = stroke.boxHeight ? stroke.boxHeight * scaleFactor : 0;
+
+        // Smart multiline wrapping if explicit width is given
+        const rawLines = String(stroke.text || '').split('\n');
+        const lines = [];
+        const maxLineWidth = targetBoxW > 0 ? Math.max(40 * scaleFactor, targetBoxW - paddingX * 2) : 100000;
+
+        for (const rawLine of rawLines) {
+            if (!rawLine) {
+                lines.push('');
+                continue;
+            }
+            if (targetBoxW > 0 && targetCtx.measureText(rawLine).width > maxLineWidth) {
+                const words = rawLine.split(' ');
+                let curLine = words[0];
+                for (let w = 1; w < words.length; w++) {
+                    const testLine = curLine + ' ' + words[w];
+                    if (targetCtx.measureText(testLine).width <= maxLineWidth) {
+                        curLine = testLine;
+                    } else {
+                        lines.push(curLine);
+                        curLine = words[w];
+                    }
+                }
+                lines.push(curLine);
+            } else {
+                lines.push(rawLine);
+            }
+        }
+
+        let maxTextW = 0;
+        for (const line of lines) {
+            const w = targetCtx.measureText(line).width;
+            if (w > maxTextW) maxTextW = w;
+        }
+
+        const totalTextH = lines.length * lineHeight;
+        const boxW = Math.max(targetBoxW || (90 * scaleFactor), maxTextW + paddingX * 2);
+        const boxH = Math.max(targetBoxH || (38 * scaleFactor), totalTextH + paddingY * 2);
+
+        const boxX = mapping.offsetX + stroke.x * mapping.targetWidth;
+        const boxY = mapping.offsetY + stroke.y * mapping.targetHeight;
+
+        // Update stroke.normBounds for accurate hit testing and selection
+        stroke.normBounds = {
+            x: stroke.x,
+            y: stroke.y,
+            w: boxW / mapping.targetWidth,
+            h: boxH / mapping.targetHeight
+        };
+
+        // Draw Box Shape Container if style is not 'none'
+        const boxStyle = stroke.boxStyle || 'glass';
+        if (boxStyle !== 'none') {
+            targetCtx.beginPath();
+            if (targetCtx.roundRect) {
+                targetCtx.roundRect(boxX, boxY, boxW, boxH, radius);
+            } else {
+                targetCtx.rect(boxX, boxY, boxW, boxH);
+            }
+
+            if (boxStyle === 'glass') {
+                targetCtx.fillStyle = 'rgba(18, 24, 38, 0.88)';
+                targetCtx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+                targetCtx.shadowBlur = 16 * scaleFactor;
+                targetCtx.shadowOffsetY = 6 * scaleFactor;
+                targetCtx.fill();
+                targetCtx.shadowColor = 'transparent';
+                targetCtx.lineWidth = Math.max(1, 1.5 * scaleFactor);
+                targetCtx.strokeStyle = 'rgba(99, 102, 241, 0.55)';
+                targetCtx.stroke();
+            } else if (boxStyle === 'neon') {
+                targetCtx.fillStyle = 'rgba(12, 15, 26, 0.94)';
+                targetCtx.fill();
+                targetCtx.lineWidth = Math.max(1.5, 2 * scaleFactor);
+                targetCtx.strokeStyle = stroke.color || '#6366f1';
+                targetCtx.shadowColor = stroke.color || '#6366f1';
+                targetCtx.shadowBlur = 18 * scaleFactor;
+                targetCtx.stroke();
+                targetCtx.shadowColor = 'transparent';
+            } else if (boxStyle === 'solid') {
+                targetCtx.fillStyle = '#1e2337';
+                targetCtx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+                targetCtx.shadowBlur = 12 * scaleFactor;
+                targetCtx.shadowOffsetY = 4 * scaleFactor;
+                targetCtx.fill();
+                targetCtx.shadowColor = 'transparent';
+                targetCtx.lineWidth = Math.max(1, 1.5 * scaleFactor);
+                targetCtx.strokeStyle = '#3b4261';
+                targetCtx.stroke();
+            } else if (boxStyle === 'clean') {
+                targetCtx.fillStyle = 'rgba(255, 255, 255, 0.04)';
+                targetCtx.fill();
+                targetCtx.lineWidth = Math.max(1, 1.5 * scaleFactor);
+                targetCtx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+                targetCtx.stroke();
+            }
+        }
+
+        // Draw Text Lines with crisp rendering
+        targetCtx.fillStyle = stroke.color || '#ffffff';
+        for (let i = 0; i < lines.length; i++) {
+            const lineX = boxX + paddingX;
+            const lineY = boxY + paddingY + i * lineHeight;
+            targetCtx.fillText(lines[i], lineX, lineY);
+        }
+
+        targetCtx.restore();
+    }
+
+    function findTextStrokeAt(normX, normY, mapping) {
+        for (let i = strokeHistory.length - 1; i >= 0; i--) {
+            const s = strokeHistory[i];
+            if (!s.isText) continue;
+            if (!s.normBounds) {
+                const scaleFactor = mapping.targetWidth / 600;
+                const approxW = Math.max(90 * scaleFactor, (s.boxWidth || 180) * scaleFactor);
+                const approxH = Math.max(38 * scaleFactor, (s.boxHeight || 60) * scaleFactor);
+                s.normBounds = {
+                    x: s.x,
+                    y: s.y,
+                    w: approxW / mapping.targetWidth,
+                    h: approxH / mapping.targetHeight
+                };
+            }
+            const b = s.normBounds;
+            if (normX >= b.x && normX <= b.x + b.w && normY >= b.y && normY <= b.y + b.h) {
+                return { stroke: s, index: i };
+            }
+        }
+        return null;
+    }
+
     function renderStroke(stroke, mapping, targetCtx) {
+        if (stroke.isText) {
+            renderTextStroke(stroke, mapping, targetCtx);
+            return;
+        }
+
         if (stroke.isFill && stroke.fillCanvas) {
             const rx = mapping.offsetX + (stroke.normBounds ? stroke.normBounds.x * mapping.targetWidth : stroke.bounds.x);
             const ry = mapping.offsetY + (stroke.normBounds ? stroke.normBounds.y * mapping.targetHeight : stroke.bounds.y);
@@ -813,6 +1003,31 @@
                 return;
             }
 
+            if (activeBrush === 'text') {
+                e.preventDefault();
+                const rect = canvasMount.getBoundingClientRect();
+                const mapping = getAspectMapping(artboardWidth / artboardHeight);
+                const clickX = e.clientX - rect.left;
+                const clickY = e.clientY - rect.top;
+                const normX = (clickX - mapping.offsetX) / mapping.targetWidth;
+                const normY = (clickY - mapping.offsetY) / mapping.targetHeight;
+
+                // If text overlay is open, clicking canvas commits it
+                if (smartTextOverlay && !smartTextOverlay.classList.contains('hidden')) {
+                    commitSmartText();
+                    return;
+                }
+
+                // Hit test: did user click an existing text box on canvas?
+                const hit = findTextStrokeAt(normX, normY, mapping);
+                if (hit) {
+                    openSmartTextEditor(hit.stroke.x, hit.stroke.y, hit.stroke);
+                } else {
+                    openSmartTextEditor(normX, normY, null);
+                }
+                return;
+            }
+
             isDrawing = true;
             canvasMount.setPointerCapture(e.pointerId);
 
@@ -870,6 +1085,13 @@
             const normX = (clickX - mapping.offsetX) / mapping.targetWidth;
             const normY = (clickY - mapping.offsetY) / mapping.targetHeight;
             const pressure = e.pressure && e.pressure > 0 ? e.pressure : (isDrawing ? 0.64 : 0);
+
+            if (activeBrush === 'text') {
+                const hit = findTextStrokeAt(normX, normY, mapping);
+                canvasMount.style.cursor = hit ? 'pointer' : 'text';
+                updateStylusHUD({ x: normX, y: normY, tilt_x: e.tiltX, tilt_y: e.tiltY }, 0, e);
+                return;
+            }
 
             updateStylusHUD({ x: normX, y: normY, tilt_x: e.tiltX, tilt_y: e.tiltY }, pressure, e);
 
@@ -1007,6 +1229,536 @@
             redrawAllStrokes();
             updateStylusReticleSize();
         }, { passive: false });
+    }
+
+    // =========================================================================
+    // 6.1. SMART TEXT BOX & DYNAMIC AUTO-EXTENDING CARD ENGINE
+    // =========================================================================
+    let customBoxWidth = null;
+    let customBoxHeight = null;
+    let isMovingTextCard = false;
+    let isResizingTextCard = false;
+    let activeResizeHandle = null;
+    let moveStartPointer = { x: 0, y: 0 };
+    let moveStartOverlayPos = { left: 0, top: 0 };
+    let resizeStartPointer = { x: 0, y: 0 };
+    let resizeStartDimensions = { w: 0, h: 0 };
+    let resizeStartOverlayPos = { left: 0, top: 0 };
+    let resizeStartFontSize = 28;
+
+    function updateSmartBoxDimensions(preserveCustomSize = true) {
+        if (!smartTextInput || !smartTextCard) return;
+
+        // Apply font family, size and color
+        smartTextInput.style.fontFamily = activeTextFontFamily;
+        smartTextInput.style.fontSize = `${activeTextFontSize}px`;
+        smartTextInput.style.color = activeColor;
+        if (textSizeVal) textSizeVal.textContent = `${activeTextFontSize}px`;
+
+        // Auto-detect optimal margins & padding proportional to font size
+        const paddingX = Math.round(Math.max(16, activeTextFontSize * 0.72));
+        const paddingY = Math.round(Math.max(12, activeTextFontSize * 0.52));
+        const borderRadius = Math.round(Math.max(10, activeTextFontSize * 0.42));
+
+        // Apply dynamically to card shape container so it extends naturally
+        smartTextCard.style.padding = `${paddingY}px ${paddingX}px`;
+        smartTextCard.style.borderRadius = `${borderRadius}px`;
+        smartTextCard.className = `smart-text-card box-style-${activeTextBoxStyle}`;
+
+        if (preserveCustomSize && customBoxWidth) {
+            smartTextCard.style.width = `${customBoxWidth}px`;
+        } else if (!preserveCustomSize) {
+            customBoxWidth = null;
+            smartTextCard.style.width = 'max-content';
+        }
+
+        if (preserveCustomSize && customBoxHeight) {
+            smartTextCard.style.minHeight = `${customBoxHeight}px`;
+        } else if (!preserveCustomSize) {
+            customBoxHeight = null;
+            smartTextCard.style.minHeight = 'auto';
+        }
+
+        // Live dimensions readout & auto-margin badge
+        const curW = Math.round(customBoxWidth || smartTextCard.offsetWidth || 140);
+        const curH = Math.round(customBoxHeight || smartTextCard.offsetHeight || 60);
+
+        if (dragBarSizeBadge) {
+            dragBarSizeBadge.textContent = `${curW}×${curH}`;
+        }
+        if (marginMetricText) {
+            marginMetricText.textContent = `Auto Margin: ${paddingX}×${paddingY}px`;
+        }
+
+        // Custom neon styling with activeColor
+        if (activeTextBoxStyle === 'neon') {
+            smartTextCard.style.borderColor = activeColor;
+            smartTextCard.style.boxShadow = `0 0 24px ${activeColor}88, inset 0 0 12px ${activeColor}28`;
+        } else {
+            smartTextCard.style.borderColor = '';
+            smartTextCard.style.boxShadow = '';
+        }
+    }
+
+    function openSmartTextEditor(normX, normY, existingStroke) {
+        if (!smartTextOverlay) return;
+
+        textEditorNormPos = { x: Math.max(0, Math.min(0.9, normX)), y: Math.max(0, Math.min(0.9, normY)) };
+        editingTextStroke = existingStroke || null;
+
+        if (existingStroke) {
+            smartTextInput.innerText = existingStroke.text || '';
+            activeTextFontSize = existingStroke.fontSize || 28;
+            activeTextFontFamily = existingStroke.fontFamily || 'Inter, sans-serif';
+            activeTextBoxStyle = existingStroke.boxStyle || 'glass';
+            customBoxWidth = existingStroke.boxWidth || null;
+            customBoxHeight = existingStroke.boxHeight || null;
+            if (existingStroke.color) {
+                activeColor = existingStroke.color;
+                applyPrimaryColor(activeColor, false);
+            }
+        } else {
+            smartTextInput.innerText = '';
+            customBoxWidth = null;
+            customBoxHeight = null;
+        }
+
+        if (textFontFamily) textFontFamily.value = activeTextFontFamily;
+        if (textStyleChips) {
+            textStyleChips.forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.style === activeTextBoxStyle);
+            });
+        }
+
+        updateSmartBoxDimensions(true);
+
+        // Position overlay on screen
+        const mapping = getAspectMapping(artboardWidth / artboardHeight);
+        const px = mapping.offsetX + textEditorNormPos.x * mapping.targetWidth;
+        const py = mapping.offsetY + textEditorNormPos.y * mapping.targetHeight;
+
+        smartTextOverlay.style.left = `${Math.max(12, Math.min(canvasMount.clientWidth - 260, px))}px`;
+        smartTextOverlay.style.top = `${Math.max(12, Math.min(canvasMount.clientHeight - 120, py))}px`;
+
+        smartTextOverlay.classList.remove('hidden');
+
+        // Redraw canvas so existing text is hidden while editor is open
+        markCommittedDirty();
+        redrawAllStrokes();
+
+        setTimeout(() => {
+            if (smartTextInput) {
+                smartTextInput.focus();
+                // Move cursor to end of text
+                const range = document.createRange();
+                const sel = window.getSelection();
+                range.selectNodeContents(smartTextInput);
+                range.collapse(false);
+                sel.removeAllRanges();
+                sel.addRange(range);
+            }
+        }, 50);
+    }
+
+    function commitSmartText() {
+        if (!smartTextOverlay || smartTextOverlay.classList.contains('hidden')) return;
+
+        const rawText = (smartTextInput ? smartTextInput.innerText : '').trim();
+
+        if (!rawText) {
+            // If empty text, delete if editing
+            if (editingTextStroke) {
+                const idx = strokeHistory.indexOf(editingTextStroke);
+                if (idx !== -1) strokeHistory.splice(idx, 1);
+            }
+            closeSmartTextEditor();
+            return;
+        }
+
+        const mapping = getAspectMapping(artboardWidth / artboardHeight);
+        const scaleFactor = mapping.targetWidth / 600;
+        const fontSize = Math.max(8, activeTextFontSize * scaleFactor);
+        ctx.font = `${fontSize}px ${activeTextFontFamily}`;
+
+        const lines = rawText.split('\n');
+        let maxTextW = 0;
+        for (const line of lines) {
+            const w = ctx.measureText(line).width;
+            if (w > maxTextW) maxTextW = w;
+        }
+
+        const padX = Math.round(Math.max(16, activeTextFontSize * 0.72));
+        const padY = Math.round(Math.max(12, activeTextFontSize * 0.52));
+        const radius = Math.round(Math.max(10, activeTextFontSize * 0.42));
+        const lineHeight = fontSize * 1.35;
+        const totalTextH = lines.length * lineHeight;
+
+        const calculatedW = Math.max(90, Math.round((maxTextW / scaleFactor) + padX * 2));
+        const calculatedH = Math.max(38, Math.round((totalTextH / scaleFactor) + padY * 2));
+
+        const boxW = customBoxWidth ? Math.max(customBoxWidth, calculatedW) : calculatedW;
+        const boxH = customBoxHeight ? Math.max(customBoxHeight, calculatedH) : calculatedH;
+
+        const stroke = editingTextStroke || {
+            stroke_id: `txt_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+            isText: true,
+            layerId: activeLayerId
+        };
+
+        stroke.isText = true;
+        stroke.text = rawText;
+        stroke.x = textEditorNormPos ? textEditorNormPos.x : 0.3;
+        stroke.y = textEditorNormPos ? textEditorNormPos.y : 0.3;
+        stroke.fontSize = activeTextFontSize;
+        stroke.fontFamily = activeTextFontFamily;
+        stroke.color = activeColor;
+        stroke.boxStyle = activeTextBoxStyle;
+        stroke.boxPaddingX = padX;
+        stroke.boxPaddingY = padY;
+        stroke.borderRadius = radius;
+        stroke.boxWidth = boxW;
+        stroke.boxHeight = boxH;
+        stroke.normBounds = {
+            x: stroke.x,
+            y: stroke.y,
+            w: (boxW * scaleFactor) / mapping.targetWidth,
+            h: (boxH * scaleFactor) / mapping.targetHeight
+        };
+
+        if (!strokeHistory.includes(stroke)) {
+            strokeHistory.push(stroke);
+        }
+        redoHistory = [];
+
+        // Broadcast over WebSocket to sync with mobile & others
+        wsSend({
+            type: 'text_element',
+            stroke_id: stroke.stroke_id,
+            text: stroke.text,
+            x: stroke.x,
+            y: stroke.y,
+            font_size: stroke.fontSize,
+            font_family: stroke.fontFamily,
+            color: stroke.color,
+            box_style: stroke.boxStyle,
+            box_width: stroke.boxWidth,
+            box_height: stroke.boxHeight,
+            box_padding_x: stroke.boxPaddingX,
+            box_padding_y: stroke.boxPaddingY,
+            border_radius: stroke.borderRadius,
+            layerId: stroke.layerId,
+            timestamp: Date.now()
+        });
+
+        closeSmartTextEditor();
+        showToast('Text box saved to artboard', 'success');
+    }
+
+    function deleteCurrentText() {
+        if (editingTextStroke) {
+            const idx = strokeHistory.indexOf(editingTextStroke);
+            if (idx !== -1) {
+                strokeHistory.splice(idx, 1);
+                showToast('Text box deleted', 'info');
+            }
+        }
+        closeSmartTextEditor();
+    }
+
+    function closeSmartTextEditor() {
+        if (!smartTextOverlay) return;
+        smartTextOverlay.classList.add('hidden');
+        editingTextStroke = null;
+        customBoxWidth = null;
+        customBoxHeight = null;
+        markCommittedDirty();
+        redrawAllStrokes();
+        maybeRenderAuxiliary(true);
+    }
+
+    function initSmartTextEngine() {
+        if (!smartTextInput) return;
+
+        smartTextInput.addEventListener('input', () => {
+            updateSmartBoxDimensions(true);
+        });
+
+        smartTextInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                e.preventDefault();
+                commitSmartText();
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                closeSmartTextEditor();
+            }
+        });
+
+        if (textFontFamily) {
+            textFontFamily.addEventListener('change', () => {
+                activeTextFontFamily = textFontFamily.value;
+                updateSmartBoxDimensions(true);
+            });
+        }
+
+        if (btnTextSizeDown) {
+            btnTextSizeDown.addEventListener('click', (e) => {
+                e.stopPropagation();
+                activeTextFontSize = Math.max(12, activeTextFontSize - 4);
+                updateSmartBoxDimensions(true);
+            });
+        }
+
+        if (btnTextSizeUp) {
+            btnTextSizeUp.addEventListener('click', (e) => {
+                e.stopPropagation();
+                activeTextFontSize = Math.min(120, activeTextFontSize + 4);
+                updateSmartBoxDimensions(true);
+            });
+        }
+
+        textStyleChips.forEach(chip => {
+            chip.addEventListener('click', (e) => {
+                e.stopPropagation();
+                textStyleChips.forEach(c => c.classList.remove('active'));
+                chip.classList.add('active');
+                activeTextBoxStyle = chip.dataset.style;
+                updateSmartBoxDimensions(true);
+            });
+        });
+
+        if (btnTextDelete) {
+            btnTextDelete.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deleteCurrentText();
+            });
+        }
+
+        if (btnTextDone) {
+            btnTextDone.addEventListener('click', (e) => {
+                e.stopPropagation();
+                commitSmartText();
+            });
+        }
+
+        // =============================================================
+        // DRAG TO MOVE ENGINE (Drag Bar, Toolbar Grip, or Card Border)
+        // =============================================================
+        function attachCardMoveHandler(element) {
+            if (!element) return;
+            element.addEventListener('pointerdown', (e) => {
+                // If clicking an editable, button, handle, or select, ignore
+                if (e.target === smartTextInput ||
+                    e.target.closest('.card-handle') ||
+                    e.target.closest('.text-tb-action-btn') ||
+                    e.target.closest('.text-tb-btn') ||
+                    e.target.closest('.text-style-chip') ||
+                    e.target.closest('select')) {
+                    return;
+                }
+                if (e.button !== 0 && e.pointerType === 'mouse') return;
+
+                e.preventDefault();
+                e.stopPropagation();
+
+                isMovingTextCard = true;
+                moveStartPointer = { x: e.clientX, y: e.clientY };
+                moveStartOverlayPos = {
+                    left: parseFloat(smartTextOverlay.style.left) || 0,
+                    top: parseFloat(smartTextOverlay.style.top) || 0
+                };
+
+                if (smartTextDragBar) smartTextDragBar.classList.add('is-dragging');
+                if (tbDragHandle) tbDragHandle.classList.add('is-dragging');
+                if (smartTextCard) smartTextCard.classList.add('is-moving');
+
+                try {
+                    element.setPointerCapture(e.pointerId);
+                } catch (err) {}
+
+                const onPointerMove = (ev) => {
+                    if (!isMovingTextCard) return;
+                    const dx = ev.clientX - moveStartPointer.x;
+                    const dy = ev.clientY - moveStartPointer.y;
+
+                    let newLeft = moveStartOverlayPos.left + dx;
+                    let newTop = moveStartOverlayPos.top + dy;
+
+                    const maxL = Math.max(20, canvasMount.clientWidth - 80);
+                    const maxT = Math.max(20, canvasMount.clientHeight - 60);
+                    newLeft = Math.max(4, Math.min(maxL, newLeft));
+                    newTop = Math.max(4, Math.min(maxT, newTop));
+
+                    smartTextOverlay.style.left = `${newLeft}px`;
+                    smartTextOverlay.style.top = `${newTop}px`;
+
+                    const mapping = getAspectMapping(artboardWidth / artboardHeight);
+                    const normX = Math.max(0, Math.min(1.0, (newLeft - mapping.offsetX) / mapping.targetWidth));
+                    const normY = Math.max(0, Math.min(1.0, (newTop - mapping.offsetY) / mapping.targetHeight));
+                    textEditorNormPos = { x: normX, y: normY };
+
+                    if (editingTextStroke) {
+                        editingTextStroke.x = normX;
+                        editingTextStroke.y = normY;
+                        if (editingTextStroke.normBounds) {
+                            editingTextStroke.normBounds.x = normX;
+                            editingTextStroke.normBounds.y = normY;
+                        }
+                    }
+                };
+
+                const onPointerUp = (ev) => {
+                    isMovingTextCard = false;
+                    if (smartTextDragBar) smartTextDragBar.classList.remove('is-dragging');
+                    if (tbDragHandle) tbDragHandle.classList.remove('is-dragging');
+                    if (smartTextCard) smartTextCard.classList.remove('is-moving');
+
+                    try {
+                        element.releasePointerCapture(ev.pointerId);
+                    } catch (err) {}
+
+                    window.removeEventListener('pointermove', onPointerMove);
+                    window.removeEventListener('pointerup', onPointerUp);
+                    window.removeEventListener('pointercancel', onPointerUp);
+                };
+
+                window.addEventListener('pointermove', onPointerMove);
+                window.addEventListener('pointerup', onPointerUp);
+                window.addEventListener('pointercancel', onPointerUp);
+            });
+        }
+
+        attachCardMoveHandler(smartTextDragBar);
+        attachCardMoveHandler(tbDragHandle);
+        attachCardMoveHandler(smartTextCard);
+
+        // =============================================================
+        // RESIZE HANDLES ENGINE (8-Point Corner & Edge Resizing)
+        // =============================================================
+        const handles = smartTextCard ? smartTextCard.querySelectorAll('.card-handle') : [];
+        handles.forEach(handle => {
+            handle.addEventListener('pointerdown', (e) => {
+                if (e.button !== 0 && e.pointerType === 'mouse') return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                const handleType = handle.dataset.handle;
+                isResizingTextCard = true;
+                activeResizeHandle = handleType;
+
+                resizeStartPointer = { x: e.clientX, y: e.clientY };
+                resizeStartDimensions = {
+                    w: smartTextCard.offsetWidth,
+                    h: smartTextCard.offsetHeight
+                };
+                resizeStartOverlayPos = {
+                    left: parseFloat(smartTextOverlay.style.left) || 0,
+                    top: parseFloat(smartTextOverlay.style.top) || 0
+                };
+                resizeStartFontSize = activeTextFontSize;
+
+                handle.classList.add('is-active');
+                smartTextCard.classList.add('is-resizing');
+
+                try {
+                    handle.setPointerCapture(e.pointerId);
+                } catch (err) {}
+
+                const isCorner = handleType.includes('top-') || handleType.includes('bottom-');
+
+                const onPointerMove = (ev) => {
+                    if (!isResizingTextCard) return;
+                    const dx = ev.clientX - resizeStartPointer.x;
+                    const dy = ev.clientY - resizeStartPointer.y;
+
+                    let newW = resizeStartDimensions.w;
+                    let newH = resizeStartDimensions.h;
+                    let newLeft = resizeStartOverlayPos.left;
+                    let newTop = resizeStartOverlayPos.top;
+
+                    if (handleType === 'bottom-right') {
+                        newW = Math.max(90, resizeStartDimensions.w + dx);
+                        newH = Math.max(38, resizeStartDimensions.h + dy);
+                    } else if (handleType === 'bottom-left') {
+                        newW = Math.max(90, resizeStartDimensions.w - dx);
+                        newH = Math.max(38, resizeStartDimensions.h + dy);
+                        newLeft = resizeStartOverlayPos.left + (resizeStartDimensions.w - newW);
+                    } else if (handleType === 'top-right') {
+                        newW = Math.max(90, resizeStartDimensions.w + dx);
+                        newH = Math.max(38, resizeStartDimensions.h - dy);
+                        newTop = resizeStartOverlayPos.top + (resizeStartDimensions.h - newH);
+                    } else if (handleType === 'top-left') {
+                        newW = Math.max(90, resizeStartDimensions.w - dx);
+                        newH = Math.max(38, resizeStartDimensions.h - dy);
+                        newLeft = resizeStartOverlayPos.left + (resizeStartDimensions.w - newW);
+                        newTop = resizeStartOverlayPos.top + (resizeStartDimensions.h - newH);
+                    } else if (handleType === 'edge-right') {
+                        newW = Math.max(90, resizeStartDimensions.w + dx);
+                    } else if (handleType === 'edge-left') {
+                        newW = Math.max(90, resizeStartDimensions.w - dx);
+                        newLeft = resizeStartOverlayPos.left + (resizeStartDimensions.w - newW);
+                    } else if (handleType === 'edge-bottom') {
+                        newH = Math.max(38, resizeStartDimensions.h + dy);
+                    } else if (handleType === 'edge-top') {
+                        newH = Math.max(38, resizeStartDimensions.h - dy);
+                        newTop = resizeStartOverlayPos.top + (resizeStartDimensions.h - newH);
+                    }
+
+                    if (isCorner && ev.shiftKey) {
+                        const scale = newW / resizeStartDimensions.w;
+                        activeTextFontSize = Math.round(Math.max(12, Math.min(120, resizeStartFontSize * scale)));
+                    }
+
+                    customBoxWidth = Math.round(newW);
+                    customBoxHeight = Math.round(newH);
+
+                    smartTextCard.style.width = `${customBoxWidth}px`;
+                    smartTextCard.style.minHeight = `${customBoxHeight}px`;
+
+                    if (newLeft !== resizeStartOverlayPos.left || newTop !== resizeStartOverlayPos.top) {
+                        smartTextOverlay.style.left = `${newLeft}px`;
+                        smartTextOverlay.style.top = `${newTop}px`;
+                        const mapping = getAspectMapping(artboardWidth / artboardHeight);
+                        textEditorNormPos = {
+                            x: Math.max(0, Math.min(1.0, (newLeft - mapping.offsetX) / mapping.targetWidth)),
+                            y: Math.max(0, Math.min(1.0, (newTop - mapping.offsetY) / mapping.targetHeight))
+                        };
+                    }
+
+                    updateSmartBoxDimensions(true);
+                };
+
+                const onPointerUp = (ev) => {
+                    isResizingTextCard = false;
+                    activeResizeHandle = null;
+                    handle.classList.remove('is-active');
+                    smartTextCard.classList.remove('is-resizing');
+
+                    try {
+                        handle.releasePointerCapture(ev.pointerId);
+                    } catch (err) {}
+
+                    window.removeEventListener('pointermove', onPointerMove);
+                    window.removeEventListener('pointerup', onPointerUp);
+                    window.removeEventListener('pointercancel', onPointerUp);
+                };
+
+                window.addEventListener('pointermove', onPointerMove);
+                window.addEventListener('pointerup', onPointerUp);
+                window.addEventListener('pointercancel', onPointerUp);
+            });
+        });
+
+        if (smartTextOverlay) {
+            smartTextOverlay.addEventListener('pointerdown', (e) => e.stopPropagation());
+        }
+
+        document.addEventListener('pointerdown', (e) => {
+            if (smartTextOverlay && !smartTextOverlay.classList.contains('hidden')) {
+                if (!smartTextOverlay.contains(e.target) && e.target !== btnDockText && !canvasMount.contains(e.target)) {
+                    commitSmartText();
+                }
+            }
+        });
     }
 
     // =========================================================================
@@ -1613,6 +2365,66 @@
         showToast('Reference image cleared', 'info');
     }
 
+    function handleIncomingLaptopTextElement(data) {
+        const mapping = getAspectMapping(artboardWidth / artboardHeight);
+        const scaleFactor = mapping.targetWidth / 600;
+        const padX = data.box_padding_x || 18;
+        const padY = data.box_padding_y || 14;
+        const radius = data.border_radius || 14;
+        const boxW = data.box_width || 200;
+        const boxH = data.box_height || 80;
+
+        let existing = strokeHistory.find(s => s.stroke_id === data.stroke_id);
+        if (existing) {
+            existing.text = data.text;
+            existing.x = data.x;
+            existing.y = data.y;
+            existing.fontSize = data.font_size;
+            existing.fontFamily = data.font_family;
+            existing.color = data.color;
+            existing.boxStyle = data.box_style;
+            existing.boxPaddingX = padX;
+            existing.boxPaddingY = padY;
+            existing.borderRadius = radius;
+            existing.boxWidth = boxW;
+            existing.boxHeight = boxH;
+            existing.normBounds = {
+                x: data.x,
+                y: data.y,
+                w: (boxW * scaleFactor) / mapping.targetWidth,
+                h: (boxH * scaleFactor) / mapping.targetHeight
+            };
+        } else {
+            const newStroke = {
+                stroke_id: data.stroke_id,
+                isText: true,
+                text: data.text,
+                x: data.x,
+                y: data.y,
+                fontSize: data.font_size,
+                fontFamily: data.font_family,
+                color: data.color,
+                boxStyle: data.box_style,
+                boxPaddingX: padX,
+                boxPaddingY: padY,
+                borderRadius: radius,
+                boxWidth: boxW,
+                boxHeight: boxH,
+                layerId: data.layerId || 'layer-2',
+                normBounds: {
+                    x: data.x,
+                    y: data.y,
+                    w: (boxW * scaleFactor) / mapping.targetWidth,
+                    h: (boxH * scaleFactor) / mapping.targetHeight
+                }
+            };
+            strokeHistory.push(newStroke);
+        }
+        markCommittedDirty();
+        redrawAllStrokes();
+        maybeRenderAuxiliary(true);
+    }
+
     function handlePacket(data) {
         if (typeof window.PhoneDrawingPad.onStrokeEvent === 'function') {
             try { window.PhoneDrawingPad.onStrokeEvent(data); } catch (e) {}
@@ -1643,6 +2455,11 @@
 
         if (data.type === 'fill') {
             handleIncomingLaptopFill(data);
+            return;
+        }
+
+        if (data.type === 'text_element') {
+            handleIncomingLaptopTextElement(data);
             return;
         }
 
@@ -1718,8 +2535,8 @@
 
         if (data.type === 'stroke_start') {
             remoteShapePreview = null;
-            updatePhoneResolution(data);
-            updateToolAndTelemetry(data);
+            try { updatePhoneResolution(data); } catch (_) {}
+            try { updateToolAndTelemetry(data); } catch (_) {}
 
             const stroke = {
                 stroke_id: data.stroke_id,
@@ -1728,7 +2545,7 @@
                 size: data.size || activeSize,
                 opacity: data.opacity !== undefined ? data.opacity : 1.0,
                 smoothing: data.smoothing || activeSmoothing,
-                layerId: activeLayerId,
+                layerId: activeLayerId || 'layer-2',
                 phone_width: data.phone_width || lastPhoneWidth,
                 phone_height: data.phone_height || lastPhoneHeight,
                 aspect_ratio: data.aspect_ratio || lastPhoneAspect,
@@ -1737,14 +2554,14 @@
 
             activeStrokesMap.set(data.stroke_id, stroke);
             if (stroke.points.length > 0) {
-                updateStylusHUD(stroke.points[0], stroke.points[0].pressure);
+                try { updateStylusHUD(stroke.points[0], stroke.points[0].pressure); } catch (_) {}
             }
             scheduleLaptopRender();
             return;
         }
 
         if (data.type === 'stroke_points' || data.type === 'stroke') {
-            updatePhoneResolution(data);
+            try { updatePhoneResolution(data); } catch (_) {}
 
             let stroke = activeStrokesMap.get(data.stroke_id);
             if (!stroke) {
@@ -1755,7 +2572,7 @@
                     size: data.size || activeSize,
                     opacity: data.opacity !== undefined ? data.opacity : 1.0,
                     smoothing: data.smoothing || activeSmoothing,
-                    layerId: activeLayerId,
+                    layerId: activeLayerId || 'layer-2',
                     phone_width: data.phone_width || lastPhoneWidth,
                     phone_height: data.phone_height || lastPhoneHeight,
                     aspect_ratio: data.aspect_ratio || lastPhoneAspect,
@@ -1772,7 +2589,7 @@
 
             const lastPt = stroke.points[stroke.points.length - 1];
             if (lastPt) {
-                updateStylusHUD(lastPt, lastPt.pressure);
+                try { updateStylusHUD(lastPt, lastPt.pressure); } catch (_) {}
             }
 
             scheduleLaptopRender();
@@ -1904,23 +2721,24 @@
         lastStylusScreenX = pxX;
         lastStylusScreenY = pxY;
 
+        const pPct = Math.round(pressure * 100);
+
         // Format Reticle HUD Badge: Chosen Brush Size & Pressure or Paint Bucket
         if (activeBrush === 'bucket') {
             reticleHudBadge.innerHTML = `<span class="badge-size">Fill Bucket</span> · <span class="badge-pressure" style="color:${activeColor}; font-weight:700;">${activeColor}</span>`;
         } else {
-            const pPct = Math.round(pressure * 100);
             const pressureLabel = pressure > 0.02 ? `P: ${pPct}%` : 'Hover';
             reticleHudBadge.innerHTML = `<span class="badge-size">${activeSize}px</span> · <span class="badge-pressure">${pressureLabel}</span>`;
         }
 
         // Update sidebar hardware feed & footer telemetry
         const raw12Bit = Math.round(pressure * 4096);
-        pressureRatioText.textContent = `${pPct}% (${raw12Bit} / 4096)`;
-        pressureProgressBar.style.width = `${pPct}%`;
+        if (pressureRatioText) pressureRatioText.textContent = `${pPct}% (${raw12Bit} / 4096)`;
+        if (pressureProgressBar) pressureProgressBar.style.width = `${pPct}%`;
         if (sidebarSizeMetricVal) sidebarSizeMetricVal.textContent = `${activeSize}px`;
 
-        footCoordX.textContent = Math.round(pxX);
-        footCoordY.textContent = Math.round(pxY);
+        if (footCoordX) footCoordX.textContent = Math.round(pxX);
+        if (footCoordY) footCoordY.textContent = Math.round(pxY);
 
         // Update Reticle Size to match current brush size
         updateStylusReticleSize();
@@ -2876,6 +3694,49 @@
 
         const svgScale = artboardWidth / 600;
         for (const stroke of strokeHistory) {
+            if (stroke.isText) {
+                const sX = stroke.x * artboardWidth;
+                const sY = stroke.y * artboardHeight;
+                const fontSize = Math.max(10, (stroke.fontSize || 28) * svgScale);
+                const padX = (stroke.boxPaddingX || 18) * svgScale;
+                const padY = (stroke.boxPaddingY || 14) * svgScale;
+                const radius = (stroke.borderRadius || 14) * svgScale;
+                const boxW = (stroke.boxWidth || 200) * svgScale;
+                const boxH = (stroke.boxHeight || 80) * svgScale;
+                const color = stroke.color || '#ffffff';
+                const boxStyle = stroke.boxStyle || 'glass';
+
+                let bgFill = 'none';
+                let strokeAttr = '';
+                if (boxStyle === 'glass') {
+                    bgFill = 'rgba(18, 24, 38, 0.88)';
+                    strokeAttr = 'stroke="rgba(99, 102, 241, 0.55)" stroke-width="1.5"';
+                } else if (boxStyle === 'neon') {
+                    bgFill = 'rgba(12, 15, 26, 0.94)';
+                    strokeAttr = `stroke="${color}" stroke-width="2"`;
+                } else if (boxStyle === 'solid') {
+                    bgFill = '#1e2337';
+                    strokeAttr = 'stroke="#3b4261" stroke-width="1.5"';
+                } else if (boxStyle === 'clean') {
+                    bgFill = 'rgba(255, 255, 255, 0.04)';
+                    strokeAttr = 'stroke="rgba(255, 255, 255, 0.35)" stroke-width="1.5"';
+                }
+
+                svgContent += `  <g transform="translate(${sX.toFixed(1)}, ${sY.toFixed(1)})">\n`;
+                if (boxStyle !== 'none') {
+                    svgContent += `    <rect width="${boxW.toFixed(1)}" height="${boxH.toFixed(1)}" rx="${radius.toFixed(1)}" fill="${bgFill}" ${strokeAttr}/>\n`;
+                }
+                const lines = String(stroke.text || '').split('\n');
+                const lineHeight = fontSize * 1.35;
+                lines.forEach((ln, lIdx) => {
+                    const textY = padY + (lIdx + 0.85) * lineHeight;
+                    const safeText = ln.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    svgContent += `    <text x="${padX.toFixed(1)}" y="${textY.toFixed(1)}" font-family="${stroke.fontFamily || 'sans-serif'}" font-size="${fontSize.toFixed(1)}" fill="${color}">${safeText}</text>\n`;
+                });
+                svgContent += `  </g>\n`;
+                continue;
+            }
+
             if (!stroke.points || stroke.points.length < 2) continue;
             const color = stroke.color || '#ffffff';
             const baseSize = stroke.size || 8;
@@ -3030,7 +3891,7 @@
                 setLaptopBrushSize(activeSize + delta);
                 showToast(`Brush size: ${activeSize}px`, 'info');
             }
-            // Tool Shortcuts: G (Paint Bucket), U (Shapes), C (Color), B (Pen / Brush), E (Eraser)
+            // Tool Shortcuts: G (Paint Bucket), U (Shapes), T (Text), C (Color), B (Pen / Brush), E (Eraser)
             if (!e.ctrlKey && !e.metaKey && !e.altKey) {
                 if (e.key === 'g' || e.key === 'G') {
                     e.preventDefault();
@@ -3039,6 +3900,9 @@
                 } else if (e.key === 'u' || e.key === 'U') {
                     e.preventDefault();
                     if (btnDockShape) btnDockShape.click();
+                } else if (e.key === 't' || e.key === 'T') {
+                    e.preventDefault();
+                    if (btnDockText) btnDockText.click();
                 } else if (e.key === 'c' || e.key === 'C') {
                     e.preventDefault();
                     colorPopover.classList.toggle('hidden');
@@ -3064,6 +3928,7 @@
                 colorPopover.classList.add('hidden');
                 if (shapesPopover) shapesPopover.classList.add('hidden');
                 if (hudSizePopover) hudSizePopover.classList.add('hidden');
+                if (smartTextOverlay) closeSmartTextEditor();
             }
         });
 
@@ -3085,6 +3950,7 @@
         initDesktopDrawing();
         initToolbarActions();
         initShapes();
+        initSmartTextEngine();
         initBrushSizeControls();
         initLaptopImageImport();
         initLayers();
