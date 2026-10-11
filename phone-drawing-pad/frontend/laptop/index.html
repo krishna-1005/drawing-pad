@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
     <!-- Main Style -->
-    <link rel="stylesheet" href="/static/laptop/style.css">
+    <link rel="stylesheet" href="/static/laptop/style.css?v=20261011_live">
 </head>
 <body class="mode-studio">
     <div class="app-layout">
@@ -62,6 +62,14 @@
                 <div class="dimension-pill-group">
                     <button id="canvas-dim-pill" class="info-pill dim-btn" title="Click to change canvas resolution">2048 × 1536 px</button>
                     <button id="btn-zoom-pill" class="info-pill zoom-btn" title="Click to cycle zoom (100% / 125% / Fit)">100%</button>
+                </div>
+
+                <!-- Active Color Badge in Header -->
+                <div class="header-color-group">
+                    <button id="btn-header-color" class="info-pill color-pill" title="Active Drawing & Fill Color (Click or press C)">
+                        <span class="header-color-indicator" id="header-color-indicator" style="background-color: #6366f1;"></span>
+                        <span id="header-color-name">#6366F1</span>
+                    </button>
                 </div>
             </div>
 
@@ -226,12 +234,83 @@
                     </svg>
                 </button>
 
-                <button class="dock-tool-btn" data-brush="eraser" title="Precision Eraser">
+                <button class="dock-tool-btn" data-brush="eraser" title="Precision Eraser (E)">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M20 20H7L3 16C2 15 2 13 3 12L13 2C14 1 16 1 17 2L21 6C22 7 22 9 21 10L11 20"/>
                         <path d="M7 12l5 5"/>
                     </svg>
                 </button>
+
+                <button class="dock-tool-btn" data-brush="bucket" title="Paint Bucket / Color Fill (G)">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M19 11l-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l5 5a2.12 2.12 0 0 0 3 0L19 11z"/>
+                        <path d="M5 2l5 5"/>
+                        <path d="M2 13h15"/>
+                        <path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.6 2-4 .3 1.4 2 2.4 2 4z"/>
+                    </svg>
+                </button>
+
+                <!-- Shapes Tool Button (Dynamic Icon based on Chosen Shape) -->
+                <button class="dock-tool-btn" id="btn-dock-shape" data-brush="shape" title="Shapes: Circle (Click to select shape or press U)">
+                    <span id="dock-shape-icon" class="dock-shape-icon">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="9"/>
+                        </svg>
+                    </span>
+                </button>
+
+                <!-- Shapes Popover Menu -->
+                <div id="shapes-popover" class="shapes-popover hidden">
+                    <div class="shapes-popover-header">
+                        <span class="popover-title">Geometric Shapes</span>
+                        <span id="popover-active-shape-name" class="active-shape-name-badge">Circle</span>
+                    </div>
+                    <div class="shapes-grid" id="shapes-grid">
+                        <button class="shape-opt-btn active" data-shape="circle" title="Circle / Ellipse">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="9"/>
+                            </svg>
+                            <span>Circle</span>
+                        </button>
+                        <button class="shape-opt-btn" data-shape="rectangle" title="Rectangle / Square">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="4" width="18" height="16" rx="1"/>
+                            </svg>
+                            <span>Rectangle</span>
+                        </button>
+                        <button class="shape-opt-btn" data-shape="line" title="Straight Line">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+                                <line x1="4" y1="20" x2="20" y2="4"/>
+                            </svg>
+                            <span>Line</span>
+                        </button>
+                        <button class="shape-opt-btn" data-shape="arrow" title="Directed Arrow">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="5" y1="19" x2="19" y2="5"/>
+                                <polyline points="10 5 19 5 19 14"/>
+                            </svg>
+                            <span>Arrow</span>
+                        </button>
+                        <button class="shape-opt-btn" data-shape="triangle" title="Equilateral Triangle">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+                                <polygon points="12 3 21 20 3 20"/>
+                            </svg>
+                            <span>Triangle</span>
+                        </button>
+                        <button class="shape-opt-btn" data-shape="star" title="5-Point Star">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+                                <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                            </svg>
+                            <span>Star</span>
+                        </button>
+                        <button class="shape-opt-btn" data-shape="diamond" title="Diamond / Rhombus">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+                                <polygon points="12 2 22 12 12 22 2 12"/>
+                            </svg>
+                            <span>Diamond</span>
+                        </button>
+                    </div>
+                </div>
 
                 <div class="dock-divider"></div>
 
@@ -251,12 +330,28 @@
                 </button>
                 <input type="file" id="input-laptop-import-image" accept="image/*" style="display: none;">
 
+                <!-- Quick Brush Size Button in Dock -->
+                <button id="btn-dock-size" class="dock-tool-btn dock-size-btn" title="Brush Size: 8px (Click to Adjust, or press [ / ])">
+                    <span id="dock-size-pill-text">8px</span>
+                </button>
+
+                <div class="dock-divider"></div>
+
+                <!-- Color Palette Button in Dock -->
+                <button id="btn-dock-color" class="dock-tool-btn dock-color-tool-btn" title="Color Palette (Click to open or press C)">
+                    <span class="dock-color-bubble-ring">
+                        <span id="dock-color-bubble" class="dock-color-bubble" style="background-color: #6366f1;"></span>
+                    </span>
+                </button>
+
                 <!-- Active Swatches -->
-                <div id="swatch-primary" class="swatch-btn primary-swatch" title="Primary Color (Click to open Color Picker)">
-                    <span class="swatch-inner" style="background-color: #6366f1;"></span>
-                </div>
-                <div id="swatch-secondary" class="swatch-btn secondary-swatch" title="Secondary Accent (Click to swap with Primary)">
-                    <span class="swatch-inner" style="background-color: #ec4899;"></span>
+                <div class="swatches-pair-row">
+                    <div id="swatch-primary" class="swatch-btn primary-swatch" title="Primary Color (Click to open Color Picker)">
+                        <span class="swatch-inner" style="background-color: #6366f1;"></span>
+                    </div>
+                    <div id="swatch-secondary" class="swatch-btn secondary-swatch" title="Secondary Accent (Click to swap with Primary)">
+                        <span class="swatch-inner" style="background-color: #ec4899;"></span>
+                    </div>
                 </div>
 
                 <!-- Color Popover Card (Opened when clicking swatch) -->
@@ -283,7 +378,58 @@
                     <span class="hud-dot"></span>
                     <span class="hud-item"><strong id="hud-phone-tool">Phone Tool: Hard Inker</strong></span>
                     <span class="hud-separator">•</span>
-                    <span class="hud-item">Size: <span id="hud-brush-size">8px</span></span>
+                    <div class="hud-size-wrapper">
+                        <button id="btn-hud-size" class="hud-size-btn" title="Adjust Brush Size (Click or press [ / ] keys)">
+                            <span>Size:</span>
+                            <strong id="hud-brush-size">8px</strong>
+                        </button>
+                        <!-- Quick Brush Size Popover -->
+                        <div id="hud-size-popover" class="hud-size-popover hidden">
+                            <div class="size-popover-header">
+                                <span>Brush Diameter</span>
+                                <span id="popover-size-display">8px</span>
+                            </div>
+                            <div class="size-slider-row">
+                                <input type="range" id="popover-size-slider" min="1" max="100" value="8" step="1">
+                            </div>
+                            <div class="popover-quick-sizes">
+                                <button class="quick-sz-btn" data-sz="2">2</button>
+                                <button class="quick-sz-btn" data-sz="4">4</button>
+                                <button class="quick-sz-btn active" data-sz="8">8</button>
+                                <button class="quick-sz-btn" data-sz="14">14</button>
+                                <button class="quick-sz-btn" data-sz="24">24</button>
+                                <button class="quick-sz-btn" data-sz="36">36</button>
+                                <button class="quick-sz-btn" data-sz="64">64</button>
+                            </div>
+                        </div>
+                    </div>
+                    <span class="hud-separator">•</span>
+                    <!-- PROMINENT COLOR SELECTION STATION (Paint Style Quick Palette) -->
+                    <div class="hud-color-station">
+                        <button id="btn-hud-color" class="hud-color-btn" title="Open Full Color Palette (C)">
+                            <span class="hud-color-swatch-ring">
+                                <span class="hud-color-swatch" id="hud-color-swatch" style="background-color: #6366f1;"></span>
+                            </span>
+                            <span class="hud-color-text">Color: <strong id="hud-color-hex">#6366F1</strong></span>
+                        </button>
+                        <div class="hud-quick-palette" id="hud-quick-palette">
+                            <button class="hud-color-chip" data-color="#F43F5E" style="background-color: #F43F5E;" title="Red (#F43F5E)"></button>
+                            <button class="hud-color-chip" data-color="#F97316" style="background-color: #F97316;" title="Orange (#F97316)"></button>
+                            <button class="hud-color-chip" data-color="#FBBF24" style="background-color: #FBBF24;" title="Yellow (#FBBF24)"></button>
+                            <button class="hud-color-chip" data-color="#10B981" style="background-color: #10B981;" title="Green (#10B981)"></button>
+                            <button class="hud-color-chip" data-color="#06B6D4" style="background-color: #06B6D4;" title="Cyan (#06B6D4)"></button>
+                            <button class="hud-color-chip" data-color="#3B82F6" style="background-color: #3B82F6;" title="Blue (#3B82F6)"></button>
+                            <button class="hud-color-chip active" data-color="#6366F1" style="background-color: #6366F1;" title="Indigo (#6366F1)"></button>
+                            <button class="hud-color-chip" data-color="#A855F7" style="background-color: #A855F7;" title="Purple (#A855F7)"></button>
+                            <button class="hud-color-chip" data-color="#EC4899" style="background-color: #EC4899;" title="Pink (#EC4899)"></button>
+                            <button class="hud-color-chip" data-color="#FFFFFF" style="background-color: #FFFFFF;" title="White (#FFFFFF)"></button>
+                            <button class="hud-color-chip" data-color="#000000" style="background-color: #000000;" title="Black (#000000)"></button>
+                        </div>
+                        <label class="hud-custom-picker-label" title="Custom Color Picker (Open color wheel)">
+                            <input type="color" id="hud-native-color" value="#6366f1" class="hud-native-color-input" />
+                            <span class="hud-rainbow-btn">🎨</span>
+                        </label>
+                    </div>
                     <span class="hud-separator">•</span>
                     <span class="hud-item hud-accent">Stream: <span id="hud-stream-protocol">Low-Latency UDP</span></span>
                 </div>
@@ -294,9 +440,9 @@
 
                     <!-- Precision Stylus Reticle & Live HUD Tooltip -->
                     <div id="stylus-reticle" class="stylus-reticle">
-                        <div class="reticle-outer-ring"></div>
+                        <div id="reticle-outer-ring" class="reticle-outer-ring"></div>
                         <div class="reticle-center-dot"></div>
-                        <div id="reticle-hud-badge" class="reticle-hud-badge">P: 64% · 41°</div>
+                        <div id="reticle-hud-badge" class="reticle-hud-badge"><span class="badge-size">8px</span> · <span class="badge-pressure">Hover</span></div>
                     </div>
 
                     <!-- Drag and Drop Overlay for Image Import -->
@@ -364,9 +510,9 @@
 
                     <!-- Tilt & Smoothing Metrics -->
                     <div class="metrics-dual-grid">
-                        <div class="metric-card" id="card-tilt">
-                            <span class="card-label">Tilt Angle</span>
-                            <span id="tilt-metric-val" class="card-value">41.8°</span>
+                        <div class="metric-card" id="card-brush-size">
+                            <span class="card-label">Active Size</span>
+                            <span id="sidebar-size-metric-val" class="card-value">8px</span>
                         </div>
                         <div class="metric-card clickable-metric" id="card-smoothing" title="Click to cycle smoothing algorithm">
                             <span class="card-label">Smoothing</span>
@@ -742,6 +888,6 @@
 
     <!-- Scripts -->
     <script src="/static/laptop/qrcode.min.js"></script>
-    <script src="/static/laptop/app.js?v=studio_v12"></script>
+    <script src="/static/laptop/app.js?v=20261011_live"></script>
 </body>
 </html>

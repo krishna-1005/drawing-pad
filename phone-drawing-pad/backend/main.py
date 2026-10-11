@@ -44,6 +44,45 @@ FRONTEND_DIR = BASE_DIR / "frontend"
 PHONE_DIR = FRONTEND_DIR / "phone"
 LAPTOP_DIR = FRONTEND_DIR / "laptop"
 
+# Live dynamic HTML endpoints with cache busting
+@app.get("/laptop")
+@app.get("/laptop/")
+async def serve_laptop():
+    index_file = LAPTOP_DIR / "index.html"
+    if not index_file.exists():
+        raise HTTPException(status_code=404, detail="Laptop UI not found")
+    content = index_file.read_text(encoding="utf-8")
+    mtime = int(index_file.stat().st_mtime)
+    content = re.sub(r'style\.css(?:\?[^"]*)?', f'style.css?v={mtime}', content)
+    content = re.sub(r'app\.js(?:\?[^"]*)?', f'app.js?v={mtime}', content)
+    return HTMLResponse(
+        content,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+
+@app.get("/phone")
+@app.get("/phone/")
+async def serve_phone():
+    index_file = PHONE_DIR / "index.html"
+    if not index_file.exists():
+        raise HTTPException(status_code=404, detail="Phone UI not found")
+    content = index_file.read_text(encoding="utf-8")
+    mtime = int(index_file.stat().st_mtime)
+    content = re.sub(r'style\.css(?:\?[^"]*)?', f'style.css?v={mtime}', content)
+    content = re.sub(r'app\.js(?:\?[^"]*)?', f'app.js?v={mtime}', content)
+    return HTMLResponse(
+        content,
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0"
+        }
+    )
+
 # Mount static file directories
 if PHONE_DIR.exists():
     app.mount("/static/phone", StaticFiles(directory=str(PHONE_DIR)), name="static_phone")
@@ -204,7 +243,8 @@ manager = ConnectionManager()
 
 # Basic WebSocket validation helpers
 HEX_COLOR_REGEX = re.compile(r"^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$")
-VALID_BRUSHES = {"pen", "pencil", "marker", "soft", "airbrush", "eraser"}
+VALID_BRUSHES = {"pen", "pencil", "marker", "soft", "airbrush", "eraser", "bucket", "shape"}
+VALID_SHAPES = {"circle", "rectangle", "line", "arrow", "triangle", "star", "diamond"}
 VALID_SMOOTHING = {"off", "low", "medium", "high"}
 
 def validate_stroke_event(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
@@ -219,10 +259,36 @@ def validate_stroke_event(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     valid_types = {
         "stroke_start", "stroke_points", "stroke", "stroke_end", 
         "undo", "redo", "clear", "sync_history", "ping", "client",
-        "import_image", "clear_image"
+        "import_image", "clear_image", "tool_update", "pointer_hover",
+        "fill", "shape_preview"
     }
     if event_type not in valid_types:
         return None
+
+    # Handle live interactive shape preview streaming
+    if event_type == "shape_preview":
+        raw_points = data.get("points", [])
+        clean_points = []
+        if isinstance(raw_points, list):
+            for pt in raw_points[:120]:
+                if isinstance(pt, dict):
+                    x = max(-0.5, min(1.5, float(pt.get("x", 0.0))))
+                    y = max(-0.5, min(1.5, float(pt.get("y", 0.0))))
+                    clean_points.append({"x": round(x, 6), "y": round(y, 6), "pressure": 0.8})
+        shape = str(data.get("shape", "circle"))
+        if shape not in VALID_SHAPES:
+            shape = "circle"
+        color = str(data.get("color", "#ffffff"))
+        if not HEX_COLOR_REGEX.match(color):
+            color = "#ffffff"
+        return {
+            "type": "shape_preview",
+            "shape": shape,
+            "color": color,
+            "size": round(max(1.0, min(200.0, float(data.get("size", 12)))), 2),
+            "opacity": round(max(0.0, min(1.0, float(data.get("opacity", 1.0)))), 3),
+            "points": clean_points
+        }
 
     # Handle image import & clear events
     if event_type == "import_image":
@@ -244,6 +310,61 @@ def validate_stroke_event(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     if event_type == "clear_image":
         return {"type": "clear_image"}
+
+    # Handle tool and brush settings synchronization across devices
+    if event_type == "tool_update":
+        brush = str(data.get("brush", "pen"))
+        if brush not in VALID_BRUSHES:
+            brush = "pen"
+        color = str(data.get("color", "#ffffff"))
+        if not HEX_COLOR_REGEX.match(color):
+            color = "#ffffff"
+        size = max(1.0, min(200.0, float(data.get("size", 12))))
+        opacity = max(0.0, min(1.0, float(data.get("opacity", 1.0))))
+        smoothing = str(data.get("smoothing", "medium"))
+        if smoothing not in VALID_SMOOTHING:
+            smoothing = "medium"
+        res = {
+            "type": "tool_update",
+            "brush": brush,
+            "color": color,
+            "size": round(size, 2),
+            "opacity": round(opacity, 3),
+            "smoothing": smoothing
+        }
+        if "shape" in data:
+            shape = str(data["shape"])
+            if shape in VALID_SHAPES:
+                res["shape"] = shape
+        return res
+
+    if event_type == "pointer_hover":
+        return {
+            "type": "pointer_hover",
+            "x": round(float(data.get("x", 0.0)), 6),
+            "y": round(float(data.get("y", 0.0)), 6),
+            "pressure": round(max(0.0, min(1.0, float(data.get("pressure", 0.0)))), 4),
+            "tilt_x": round(float(data.get("tilt_x", 0.0)), 2),
+            "tilt_y": round(float(data.get("tilt_y", 0.0)), 2),
+            "angle": round(float(data.get("angle", 0.0)), 2),
+            "tilt": round(float(data.get("tilt", 0.0)), 2),
+            "size": round(max(1.0, min(200.0, float(data.get("size", 12)))), 2),
+            "brush": str(data.get("brush", "pen"))
+        }
+
+    if event_type == "fill":
+        color = str(data.get("color", "#ffffff"))
+        if not HEX_COLOR_REGEX.match(color):
+            color = "#ffffff"
+        return {
+            "type": "fill",
+            "stroke_id": str(data.get("stroke_id", "")),
+            "x": round(float(data.get("x", 0.0)), 6),
+            "y": round(float(data.get("y", 0.0)), 6),
+            "color": color,
+            "tolerance": int(data.get("tolerance", 32)),
+            "layerId": str(data.get("layerId", "layer-2"))
+        }
 
     # Handle simple control events
     if event_type in ["ping", "clear", "undo", "redo"]:
@@ -285,7 +406,7 @@ def validate_stroke_event(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         if not HEX_COLOR_REGEX.match(color):
             color = "#000000"
 
-        size = max(1.0, min(100.0, float(data.get("size", 12))))
+        size = max(1.0, min(200.0, float(data.get("size", 12))))
         opacity = max(0.0, min(1.0, float(data.get("opacity", 1.0))))
         pressure_enabled = bool(data.get("pressure_enabled", True))
         
@@ -306,22 +427,40 @@ def validate_stroke_event(data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
                     x = max(-0.5, min(1.5, float(pt.get("x", 0.0))))
                     y = max(-0.5, min(1.5, float(pt.get("y", 0.0))))
                     pressure = max(0.0, min(1.0, float(pt.get("pressure", 0.5))))
-                    clean_points.append({
+                    pt_dict = {
                         "x": round(x, 6),
                         "y": round(y, 6),
                         "pressure": round(pressure, 4)
-                    })
+                    }
+                    if "tilt_x" in pt:
+                        pt_dict["tilt_x"] = round(float(pt["tilt_x"]), 2)
+                    if "tilt_y" in pt:
+                        pt_dict["tilt_y"] = round(float(pt["tilt_y"]), 2)
+                    if "angle" in pt:
+                        pt_dict["angle"] = round(float(pt["angle"]), 2)
+                    if "tilt" in pt:
+                        pt_dict["tilt"] = round(float(pt["tilt"]), 2)
+                    clean_points.append(pt_dict)
 
         # Single point fallback for legacy stroke event
         if not clean_points and ("x" in data and "y" in data):
             x = max(-0.5, min(1.5, float(data.get("x", 0.0))))
             y = max(-0.5, min(1.5, float(data.get("y", 0.0))))
             pressure = max(0.0, min(1.0, float(data.get("pressure", 0.5))))
-            clean_points.append({
+            pt_dict = {
                 "x": round(x, 6),
                 "y": round(y, 6),
                 "pressure": round(pressure, 4)
-            })
+            }
+            if "tilt_x" in data:
+                pt_dict["tilt_x"] = round(float(data["tilt_x"]), 2)
+            if "tilt_y" in data:
+                pt_dict["tilt_y"] = round(float(data["tilt_y"]), 2)
+            if "angle" in data:
+                pt_dict["angle"] = round(float(data["angle"]), 2)
+            if "tilt" in data:
+                pt_dict["tilt"] = round(float(data["tilt"]), 2)
+            clean_points.append(pt_dict)
 
         return {
             "type": event_type,

@@ -28,7 +28,7 @@
             touch-action: none;
         }
     </style>
-    <link rel="stylesheet" href="/static/phone/style.css?v=studio_v5">
+    <link rel="stylesheet" href="/static/phone/style.css?v=20261011_live">
 </head>
 <body class="mobile-studio">
     <div class="phone-layout">
@@ -207,6 +207,44 @@
                         </button>
                     </div>
                 </div>
+
+                <!-- Tab 4: Shapes Drawer -->
+                <div id="drawer-shapes" class="drawer-pane hidden" style="display: none;">
+                    <div class="drawer-header">
+                        <span class="drawer-title">Geometric Shapes</span>
+                        <span class="drawer-subtitle">Tap to choose shape to draw</span>
+                    </div>
+                    <div class="phone-shapes-grid" id="phone-shapes-grid">
+                        <button class="phone-shape-card active" data-shape="circle">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/></svg>
+                            <span>Circle</span>
+                        </button>
+                        <button class="phone-shape-card" data-shape="rectangle">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="16" rx="1"/></svg>
+                            <span>Rectangle</span>
+                        </button>
+                        <button class="phone-shape-card" data-shape="line">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="20" x2="20" y2="4"/></svg>
+                            <span>Line</span>
+                        </button>
+                        <button class="phone-shape-card" data-shape="arrow">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="10 5 19 5 19 14"/></svg>
+                            <span>Arrow</span>
+                        </button>
+                        <button class="phone-shape-card" data-shape="triangle">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><polygon points="12 3 21 20 3 20"/></svg>
+                            <span>Triangle</span>
+                        </button>
+                        <button class="phone-shape-card" data-shape="star">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                            <span>Star</span>
+                        </button>
+                        <button class="phone-shape-card" data-shape="diamond">
+                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><polygon points="12 2 22 12 12 22 2 12"/></svg>
+                            <span>Diamond</span>
+                        </button>
+                    </div>
+                </div>
             </div>
 
             <input type="file" id="input-import-image" accept="image/*" style="display: none;">
@@ -256,6 +294,24 @@
                             <path d="M7 12l5 5"/>
                         </svg>
                         <span>Eraser</span>
+                    </button>
+                    <button class="brush-btn bucket-btn" data-brush="bucket" title="Color Fill / Paint Bucket">
+                        <svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M19 11l-8-8-8.5 8.5a2.12 2.12 0 0 0 0 3l5 5a2.12 2.12 0 0 0 3 0L19 11z"/>
+                            <path d="M5 2l5 5"/>
+                            <path d="M2 13h15"/>
+                            <path d="M22 20a2 2 0 1 1-4 0c0-1.6 1.7-2.6 2-4 .3 1.4 2 2.4 2 4z"/>
+                        </svg>
+                        <span>Fill</span>
+                    </button>
+                    <!-- Shapes Button with Dynamic Icon -->
+                    <button class="brush-btn shape-btn" data-brush="shape" id="btn-phone-shape" title="Shapes (Tap to change shape)">
+                        <span id="phone-shape-icon-wrap">
+                            <svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                                <circle cx="12" cy="12" r="9"/>
+                            </svg>
+                        </span>
+                        <span id="phone-shape-text">Circle</span>
                     </button>
                 </div>
 
@@ -361,6 +417,6 @@
         </div>
     </div>
 
-    <script src="/static/phone/app.js?v=studio_v12"></script>
+    <script src="/static/phone/app.js?v=20261011_live"></script>
 </body>
 </html>

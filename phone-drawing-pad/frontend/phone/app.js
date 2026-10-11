@@ -102,6 +102,25 @@
     let currentSmoothing= localStorage.getItem('pdp_smooth')  || 'medium';
     let pressureEnabled = localStorage.getItem('pdp_pressure') !== 'false';
     let previousBrush   = 'pen';
+
+    // Shapes State & Icons
+    let currentShape = 'circle';
+    let isPhoneDrawingShape = false;
+    let phoneShapeStart = null;
+    let phoneShapeCurrent = null;
+    let inProgressPhoneShapePts = null;
+    let phoneShapeStrokeId = null;
+    let remotePhoneShapePreview = null;
+
+    const SHAPE_SVGS = {
+        'circle': `<svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="9"/></svg>`,
+        'rectangle': `<svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="16" rx="1"/></svg>`,
+        'line': `<svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="20" x2="20" y2="4"/></svg>`,
+        'arrow': `<svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="19" x2="19" y2="5"/><polyline points="10 5 19 5 19 14"/></svg>`,
+        'triangle': `<svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><polygon points="12 3 21 20 3 20"/></svg>`,
+        'star': `<svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,
+        'diamond': `<svg class="tool-svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linejoin="round"><polygon points="12 2 22 12 12 22 2 12"/></svg>`
+    };
     let canvasBg        = localStorage.getItem('pdp_bg') || '#111726';
     let gridSize        = parseInt(localStorage.getItem('pdp_gridsize') || '24', 10);
     let gridVisible     = false;
@@ -246,6 +265,10 @@
         };
     }
 
+    let lastNormPtX = null;
+    let lastNormPtY = null;
+    let lastHoverTime = 0;
+
     function getNormPoint(e) {
         const rect = getCanvasRect();
         const localX = (e.clientX - rect.left - panX) / zoomScale;
@@ -262,17 +285,51 @@
             pressure = 1.0;
         }
 
+        const tiltX = (e.tiltX !== undefined) ? e.tiltX : 0;
+        const tiltY = (e.tiltY !== undefined) ? e.tiltY : 0;
+        const altitude = (e.altitudeAngle !== undefined) ? Math.round(e.altitudeAngle * 180 / Math.PI) : null;
+        const azimuth = (e.azimuthAngle !== undefined) ? Math.round((e.azimuthAngle * 180 / Math.PI + 360) % 360) : null;
+
+        let angle = 0;
+        let tilt = 0;
+        if (tiltX !== 0 || tiltY !== 0) {
+            tilt = Math.round(Math.hypot(tiltX, tiltY));
+            angle = Math.round((Math.atan2(tiltY, tiltX) * 180 / Math.PI + 360) % 360);
+        } else if (altitude !== null && azimuth !== null) {
+            tilt = Math.round(90 - altitude);
+            angle = azimuth;
+        } else if (lastNormPtX !== null && lastNormPtY !== null) {
+            const dX = normX - lastNormPtX;
+            const dY = normY - lastNormPtY;
+            if (Math.hypot(dX, dY) > 0.002) {
+                angle = Math.round(((Math.atan2(dY, dX) * 180 / Math.PI + 360) % 360) * 10) / 10;
+                tilt = Math.round(30 + Math.min(1.0, Math.hypot(dX, dY) * 25) * 35);
+            }
+        }
+        lastNormPtX = normX;
+        lastNormPtY = normY;
+
         return {
             x: Math.max(-0.2, Math.min(1.2, normX)),
             y: Math.max(-0.2, Math.min(1.2, normY)),
             px: localX,
             py: localY,
-            pressure
+            pressure,
+            tilt_x: tiltX,
+            tilt_y: tiltY,
+            altitude,
+            azimuth,
+            angle,
+            tilt
         };
     }
 
     // --- Pointer lifecycle ---
     function onPointerDown(e) {
+        if (viewport.setPointerCapture) {
+            try { viewport.setPointerCapture(e.pointerId); } catch (_) {}
+        }
+
         // Track pointer for gesture detection
         activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
@@ -292,9 +349,25 @@
         if (e.button !== undefined && e.button !== 0) return;
         e.preventDefault();
 
+        // Check if color bucket / paint fill tool is active
+        if (currentBrush === 'bucket') {
+            const pt = getNormPoint(e);
+            performPhoneAnimatedFill(pt.x, pt.y, currentColor, true);
+            return;
+        }
+
+        // Check if shapes tool is active
+        if (currentBrush === 'shape') {
+            isPhoneDrawingShape = true;
+            phoneShapeStart = getNormPoint(e);
+            phoneShapeCurrent = { ...phoneShapeStart };
+            phoneShapeStrokeId = `s_shape_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
+            inProgressPhoneShapePts = generateShapePoints(currentShape, phoneShapeStart, phoneShapeCurrent);
+            return;
+        }
+
         isDrawing = true;
         redoHistory = [];
-        pendingWsPoints = [];
 
         const pt = getNormPoint(e);
         currentStroke = {
@@ -324,39 +397,15 @@
             phone_width:  currentStroke.phone_width,
             phone_height: currentStroke.phone_height,
             aspect_ratio: currentStroke.aspect_ratio,
-            points: [{ x: pt.x, y: pt.y, pressure: pt.pressure }]
-        });
-    }
-
-    let pendingWsPoints = [];
-    let wsFlushScheduled = false;
-
-    function scheduleWsFlush() {
-        if (!wsFlushScheduled) {
-            wsFlushScheduled = true;
-            requestAnimationFrame(flushPendingWsPoints);
-        }
-    }
-
-    function flushPendingWsPoints() {
-        wsFlushScheduled = false;
-        if (!currentStroke || pendingWsPoints.length === 0) return;
-        const ptsToSend = pendingWsPoints;
-        pendingWsPoints = [];
-
-        wsSend({
-            type: 'stroke_points',
-            stroke_id: currentStroke.stroke_id,
-            brush: currentStroke.brush,
-            color: currentStroke.color,
-            size:  currentStroke.size,
-            opacity: currentStroke.opacity,
-            pressure_enabled: currentStroke.pressure_enabled,
-            smoothing: currentStroke.smoothing,
-            phone_width:  currentStroke.phone_width,
-            phone_height: currentStroke.phone_height,
-            aspect_ratio: currentStroke.aspect_ratio,
-            points: ptsToSend.map(p => ({ x: p.x, y: p.y, pressure: p.pressure }))
+            points: [{
+                x: pt.x,
+                y: pt.y,
+                pressure: pt.pressure,
+                tilt_x: pt.tilt_x,
+                tilt_y: pt.tilt_y,
+                angle: pt.angle,
+                tilt: pt.tilt
+            }]
         });
     }
 
@@ -372,7 +421,44 @@
             return;
         }
 
-        if (!isDrawing || !currentStroke) return;
+        if (isPhoneDrawingShape && phoneShapeStart) {
+            e.preventDefault();
+            phoneShapeCurrent = getNormPoint(e);
+            inProgressPhoneShapePts = generateShapePoints(currentShape, phoneShapeStart, phoneShapeCurrent);
+            scheduleLocalRedraw();
+            if (inProgressPhoneShapePts && inProgressPhoneShapePts.length > 1) {
+                wsSend({
+                    type: 'shape_preview',
+                    shape: currentShape,
+                    color: currentColor,
+                    size: currentSize,
+                    opacity: currentOpacity,
+                    points: inProgressPhoneShapePts
+                });
+            }
+            return;
+        }
+
+        if (!isDrawing || !currentStroke) {
+            if (activePointers.size <= 1) {
+                const now = performance.now();
+                if (now - lastHoverTime > 35) {
+                    lastHoverTime = now;
+                    const pt = getNormPoint(e);
+                    wsSend({
+                        type: 'pointer_hover',
+                        x: pt.x,
+                        y: pt.y,
+                        pressure: 0,
+                        tilt_x: pt.tilt_x,
+                        tilt_y: pt.tilt_y,
+                        angle: pt.angle,
+                        tilt: pt.tilt
+                    });
+                }
+            }
+            return;
+        }
         if (activePointers.size > 1) return; // Don't draw during multi-touch
         e.preventDefault();
 
@@ -384,16 +470,40 @@
             const pt = getNormPoint(evt);
             newPts.push(pt);
             currentStroke.points.push(pt);
-            pendingWsPoints.push(pt);
         }
 
         if (newPts.length > 0) {
             scheduleLocalRedraw();
-            scheduleWsFlush();
+            // Direct zero-latency WebSocket stream to laptop as finger moves
+            wsSend({
+                type: 'stroke_points',
+                stroke_id: currentStroke.stroke_id,
+                brush: currentStroke.brush,
+                color: currentStroke.color,
+                size:  currentStroke.size,
+                opacity: currentStroke.opacity,
+                pressure_enabled: currentStroke.pressure_enabled,
+                smoothing: currentStroke.smoothing,
+                phone_width:  currentStroke.phone_width,
+                phone_height: currentStroke.phone_height,
+                aspect_ratio: currentStroke.aspect_ratio,
+                points: newPts.map(p => ({
+                    x: p.x,
+                    y: p.y,
+                    pressure: p.pressure,
+                    tilt_x: p.tilt_x,
+                    tilt_y: p.tilt_y,
+                    angle: p.angle,
+                    tilt: p.tilt
+                }))
+            });
         }
     }
 
     function onPointerUp(e) {
+        if (viewport.releasePointerCapture) {
+            try { viewport.releasePointerCapture(e.pointerId); } catch (_) {}
+        }
         activePointers.delete(e.pointerId);
 
         // End gesture if fingers lifted
@@ -401,13 +511,57 @@
             gestureActive = false;
         }
 
+        if (isPhoneDrawingShape && phoneShapeStart && phoneShapeCurrent) {
+            isPhoneDrawingShape = false;
+            const pts = inProgressPhoneShapePts || generateShapePoints(currentShape, phoneShapeStart, phoneShapeCurrent);
+            inProgressPhoneShapePts = null;
+            phoneShapeStart = null;
+            phoneShapeCurrent = null;
+
+            if (pts && pts.length > 2) {
+                const strokeId = phoneShapeStrokeId || `s_shape_${Date.now()}_${Math.floor(Math.random() * 9999)}`;
+                phoneShapeStrokeId = null;
+                const shapeStroke = {
+                    stroke_id: strokeId,
+                    brush: 'pen',
+                    isShape: true,
+                    shapeType: currentShape,
+                    color: currentColor,
+                    size: currentSize,
+                    opacity: currentOpacity,
+                    pressure_enabled: false,
+                    smoothing: 'off',
+                    phone_width: cssW,
+                    phone_height: cssH,
+                    aspect_ratio: cssW / Math.max(1, cssH),
+                    points: pts
+                };
+                strokeHistory.push(shapeStroke);
+                redoHistory = [];
+                updateUndoRedoUI();
+                redrawAll();
+                wsSend({
+                    type: 'stroke_start',
+                    ...shapeStroke,
+                    points: [pts[0]]
+                });
+                wsSend({
+                    type: 'stroke_points',
+                    stroke_id: strokeId,
+                    points: pts.slice(1)
+                });
+                wsSend({
+                    type: 'stroke_end',
+                    stroke_id: strokeId
+                });
+            }
+            return;
+        }
+
         if (!isDrawing || !currentStroke) return;
         e.preventDefault();
 
         isDrawing = false;
-        if (wsFlushScheduled || pendingWsPoints.length > 0) {
-            flushPendingWsPoints();
-        }
         if (currentStroke.points.length > 0) {
             strokeHistory.push(currentStroke);
             updateUndoRedoUI();
@@ -418,6 +572,9 @@
     }
 
     function cancelCurrentStroke() {
+        if (viewport.releasePointerCapture) {
+            try { viewport.releasePointerCapture(); } catch (_) {}
+        }
         if (currentStroke) {
             wsSend({ type: 'stroke_end', stroke_id: currentStroke.stroke_id });
         }
@@ -462,7 +619,9 @@
     viewport.addEventListener('pointermove',   onPointerMove,   { passive: false });
     viewport.addEventListener('pointerup',     onPointerUp,     { passive: false });
     viewport.addEventListener('pointercancel', onPointerUp,     { passive: false });
-    viewport.addEventListener('pointerleave',  onPointerUp,     { passive: false });
+    viewport.addEventListener('pointerleave',  (e) => {
+        if (e.pointerType === 'mouse') onPointerUp(e);
+    }, { passive: false });
 
     // Prevent default touch behaviour that could scroll the page
     viewport.addEventListener('touchstart', e => { if (e.touches.length === 1) e.preventDefault(); }, { passive: false });
@@ -670,12 +829,46 @@
         for (const stroke of remoteStrokesMap.values()) {
             renderComplete(stroke);
         }
+
+        // Render in-progress shape preview while dragging
+        if (isPhoneDrawingShape && inProgressPhoneShapePts && inProgressPhoneShapePts.length > 1) {
+            renderComplete({
+                brush: 'pen',
+                color: currentColor,
+                size: currentSize,
+                opacity: currentOpacity,
+                smoothing: 'off',
+                points: inProgressPhoneShapePts
+            });
+        }
+
+        // Render in-progress remote shape preview from counterpart device
+        if (remotePhoneShapePreview && remotePhoneShapePreview.points && remotePhoneShapePreview.points.length > 1) {
+            renderComplete(remotePhoneShapePreview);
+        }
+
         updateUndoRedoUI();
     }
 
     /** Render a complete stroke from its normalised point data */
     function renderComplete(stroke) {
+        if (!stroke) return;
         const mapping = getPhoneArtboardMapping();
+
+        if (stroke.isFill && stroke.fillCanvas && stroke.normBounds) {
+            ctx.save();
+            ctx.globalAlpha = stroke.opacity !== undefined ? stroke.opacity : 1.0;
+            const destX = mapping.artX + stroke.normBounds.x * mapping.artW;
+            const destY = mapping.artY + stroke.normBounds.y * mapping.artH;
+            const destW = stroke.normBounds.w * mapping.artW;
+            const destH = stroke.normBounds.h * mapping.artH;
+            ctx.drawImage(stroke.fillCanvas, destX, destY, destW, destH);
+            ctx.restore();
+            return;
+        }
+
+        if (!stroke.points || stroke.points.length === 0) return;
+
         const pxPts = stroke.points.map(p => {
             const nx = p.x !== undefined ? p.x : 0;
             const ny = p.y !== undefined ? p.y : 0;
@@ -740,6 +933,408 @@
     }
 
     // ================================================================
+    //  GEOMETRIC SHAPES GENERATOR
+    // ================================================================
+    function generateShapePoints(shapeType, p1, p2) {
+        const minX = Math.min(p1.x, p2.x);
+        const maxX = Math.max(p1.x, p2.x);
+        const minY = Math.min(p1.y, p2.y);
+        const maxY = Math.max(p1.y, p2.y);
+        const cx = (p1.x + p2.x) / 2;
+        const cy = (p1.y + p2.y) / 2;
+        const rx = Math.abs(p2.x - p1.x) / 2;
+        const ry = Math.abs(p2.y - p1.y) / 2;
+
+        if (rx < 0.002 && ry < 0.002) return [];
+
+        const pts = [];
+
+        if (shapeType === 'circle') {
+            const steps = 64;
+            for (let i = 0; i <= steps; i++) {
+                const theta = (i / steps) * Math.PI * 2;
+                pts.push({
+                    x: cx + rx * Math.cos(theta),
+                    y: cy + ry * Math.sin(theta),
+                    pressure: 0.8
+                });
+            }
+        } else if (shapeType === 'rectangle') {
+            const corners = [
+                { x: minX, y: minY },
+                { x: maxX, y: minY },
+                { x: maxX, y: maxY },
+                { x: minX, y: maxY },
+                { x: minX, y: minY }
+            ];
+            for (let i = 0; i < 4; i++) {
+                const c1 = corners[i], c2 = corners[i + 1];
+                for (let s = 0; s < 12; s++) {
+                    const t = s / 12;
+                    pts.push({
+                        x: c1.x + (c2.x - c1.x) * t,
+                        y: c1.y + (c2.y - c1.y) * t,
+                        pressure: 0.8
+                    });
+                }
+            }
+            pts.push({ x: corners[0].x, y: corners[0].y, pressure: 0.8 });
+        } else if (shapeType === 'triangle') {
+            const corners = [
+                { x: cx, y: minY },
+                { x: maxX, y: maxY },
+                { x: minX, y: maxY },
+                { x: cx, y: minY }
+            ];
+            for (let i = 0; i < 3; i++) {
+                const c1 = corners[i], c2 = corners[i + 1];
+                for (let s = 0; s < 14; s++) {
+                    const t = s / 14;
+                    pts.push({
+                        x: c1.x + (c2.x - c1.x) * t,
+                        y: c1.y + (c2.y - c1.y) * t,
+                        pressure: 0.8
+                    });
+                }
+            }
+            pts.push({ x: corners[0].x, y: corners[0].y, pressure: 0.8 });
+        } else if (shapeType === 'line') {
+            const steps = 20;
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                pts.push({
+                    x: p1.x + (p2.x - p1.x) * t,
+                    y: p1.y + (p2.y - p1.y) * t,
+                    pressure: 0.8
+                });
+            }
+        } else if (shapeType === 'arrow') {
+            const steps = 20;
+            for (let i = 0; i <= steps; i++) {
+                const t = i / steps;
+                pts.push({
+                    x: p1.x + (p2.x - p1.x) * t,
+                    y: p1.y + (p2.y - p1.y) * t,
+                    pressure: 0.8
+                });
+            }
+            const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+            const headLen = Math.min(0.06, Math.hypot(p2.x - p1.x, p2.y - p1.y) * 0.28);
+            const a1 = angle - Math.PI / 6;
+            const a2 = angle + Math.PI / 6;
+            pts.push({ x: p2.x - headLen * Math.cos(a1), y: p2.y - headLen * Math.sin(a1), pressure: 0.8 });
+            pts.push({ x: p2.x, y: p2.y, pressure: 0.8 });
+            pts.push({ x: p2.x - headLen * Math.cos(a2), y: p2.y - headLen * Math.sin(a2), pressure: 0.8 });
+        } else if (shapeType === 'star') {
+            const pointsCount = 5;
+            const outerR = Math.max(rx, ry);
+            const innerR = outerR * 0.42;
+            const starCorners = [];
+            for (let i = 0; i < pointsCount * 2; i++) {
+                const r = i % 2 === 0 ? outerR : innerR;
+                const a = (i / (pointsCount * 2)) * Math.PI * 2 - Math.PI / 2;
+                starCorners.push({ x: cx + r * Math.cos(a) * (rx / (outerR || 1)), y: cy + r * Math.sin(a) * (ry / (outerR || 1)) });
+            }
+            starCorners.push({ ...starCorners[0] });
+            for (let i = 0; i < starCorners.length - 1; i++) {
+                const c1 = starCorners[i], c2 = starCorners[i + 1];
+                for (let s = 0; s < 6; s++) {
+                    const t = s / 6;
+                    pts.push({
+                        x: c1.x + (c2.x - c1.x) * t,
+                        y: c1.y + (c2.y - c1.y) * t,
+                        pressure: 0.8
+                    });
+                }
+            }
+            pts.push({ x: starCorners[0].x, y: starCorners[0].y, pressure: 0.8 });
+        } else if (shapeType === 'diamond') {
+            const corners = [
+                { x: cx, y: minY },
+                { x: maxX, y: cy },
+                { x: cx, y: maxY },
+                { x: minX, y: cy },
+                { x: cx, y: minY }
+            ];
+            for (let i = 0; i < 4; i++) {
+                const c1 = corners[i], c2 = corners[i + 1];
+                for (let s = 0; s < 12; s++) {
+                    const t = s / 12;
+                    pts.push({
+                        x: c1.x + (c2.x - c1.x) * t,
+                        y: c1.y + (c2.y - c1.y) * t,
+                        pressure: 0.8
+                    });
+                }
+            }
+            pts.push({ x: corners[0].x, y: corners[0].y, pressure: 0.8 });
+        }
+
+        return pts;
+    }
+
+    // ================================================================
+    //  COLOR BUCKET / ANIMATED FLOOD FILL ENGINE
+    // ================================================================
+    let isPhoneFillAnimating = false;
+
+    function hexToRgba(hex) {
+        let c = (hex || '#ffffff').replace('#', '');
+        if (c.length === 3) c = c.split('').map(x => x + x).join('');
+        const num = parseInt(c, 16);
+        return {
+            r: (num >> 16) & 255,
+            g: (num >> 8) & 255,
+            b: num & 255,
+            a: 255
+        };
+    }
+
+    function playDropSound() {
+        try {
+            const AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            const actx = new AudioCtx();
+            const osc = actx.createOscillator();
+            const gain = actx.createGain();
+            osc.type = 'sine';
+            const now = actx.currentTime;
+            osc.frequency.setValueAtTime(580, now);
+            osc.frequency.exponentialRampToValueAtTime(260, now + 0.16);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+            osc.connect(gain);
+            gain.connect(actx.destination);
+            osc.start(now);
+            osc.stop(now + 0.2);
+        } catch (e) {}
+    }
+
+    function performPhoneAnimatedFill(normX, normY, fillColorHex = currentColor, broadcast = true) {
+        if (isPhoneFillAnimating) return;
+        const mapping = getPhoneArtboardMapping();
+        const dpr = window.devicePixelRatio || 1;
+
+        redrawAll();
+
+        const W = canvasEl.width;
+        const H = canvasEl.height;
+
+        const artLeft = Math.max(0, Math.floor(mapping.artX * dpr));
+        const artTop = Math.max(0, Math.floor(mapping.artY * dpr));
+        const artRight = Math.min(W - 1, Math.ceil((mapping.artX + mapping.artW) * dpr));
+        const artBottom = Math.min(H - 1, Math.ceil((mapping.artY + mapping.artH) * dpr));
+
+        const clickCssX = mapping.artX + normX * mapping.artW;
+        const clickCssY = mapping.artY + normY * mapping.artH;
+        const startX = Math.round(clickCssX * dpr);
+        const startY = Math.round(clickCssY * dpr);
+
+        if (startX < artLeft || startX > artRight || startY < artTop || startY > artBottom) {
+            return;
+        }
+
+        const imgData = ctx.getImageData(0, 0, W, H);
+        const data = imgData.data;
+
+        const startIdx = (startY * W + startX) * 4;
+        const targetR = data[startIdx];
+        const targetG = data[startIdx + 1];
+        const targetB = data[startIdx + 2];
+        const targetA = data[startIdx + 3];
+
+        const fillRgba = hexToRgba(fillColorHex);
+        const diffStart = Math.abs(targetR - fillRgba.r) + Math.abs(targetG - fillRgba.g) + Math.abs(targetB - fillRgba.b);
+        if (diffStart < 14) return;
+
+        const tolerance = 42;
+        function matchPixel(idx) {
+            const dr = Math.abs(data[idx] - targetR);
+            const dg = Math.abs(data[idx + 1] - targetG);
+            const db = Math.abs(data[idx + 2] - targetB);
+            const da = Math.abs(data[idx + 3] - targetA);
+            return (dr + dg + db + da) <= tolerance * 4;
+        }
+
+        const visited = new Uint8Array(W * H);
+        const stack = [startX, startY];
+        let minX = startX, maxX = startX, minY = startY, maxY = startY;
+        let maxDist = 0;
+        let filledCount = 0;
+
+        while (stack.length > 0) {
+            const cy = stack.pop();
+            const cx = stack.pop();
+
+            let lx = cx;
+            while (lx >= artLeft && !visited[cy * W + lx] && matchPixel((cy * W + lx) * 4)) {
+                lx--;
+            }
+            lx++;
+
+            let rx = cx;
+            while (rx <= artRight && !visited[cy * W + rx] && matchPixel((cy * W + rx) * 4)) {
+                rx++;
+            }
+            rx--;
+
+            if (lx > rx) continue;
+
+            if (lx < minX) minX = lx;
+            if (rx > maxX) maxX = rx;
+            if (cy < minY) minY = cy;
+            if (cy > maxY) maxY = cy;
+
+            let scanAbove = true;
+            let scanBelow = true;
+
+            for (let x = lx; x <= rx; x++) {
+                const idx = cy * W + x;
+                visited[idx] = 1;
+                filledCount++;
+
+                const d = Math.hypot(x - startX, cy - startY);
+                if (d > maxDist) maxDist = d;
+
+                if (cy > artTop) {
+                    const aIdx = (cy - 1) * W + x;
+                    if (!visited[aIdx] && matchPixel(aIdx * 4)) {
+                        if (scanAbove) {
+                            stack.push(x, cy - 1);
+                            scanAbove = false;
+                        }
+                    } else {
+                        scanAbove = true;
+                    }
+                }
+
+                if (cy < artBottom) {
+                    const bIdx = (cy + 1) * W + x;
+                    if (!visited[bIdx] && matchPixel(bIdx * 4)) {
+                        if (scanBelow) {
+                            stack.push(x, cy + 1);
+                            scanBelow = false;
+                        }
+                    } else {
+                        scanBelow = true;
+                    }
+                }
+            }
+        }
+
+        if (filledCount < 4) return;
+
+        const bw = maxX - minX + 1;
+        const bh = maxY - minY + 1;
+        const fillCanvas = document.createElement('canvas');
+        fillCanvas.width = bw;
+        fillCanvas.height = bh;
+        const fCtx = fillCanvas.getContext('2d');
+        const fImg = fCtx.createImageData(bw, bh);
+        const fData = fImg.data;
+
+        for (let y = minY; y <= maxY; y++) {
+            for (let x = minX; x <= maxX; x++) {
+                if (visited[y * W + x] === 1) {
+                    const lIdx = ((y - minY) * bw + (x - minX)) * 4;
+                    fData[lIdx] = fillRgba.r;
+                    fData[lIdx + 1] = fillRgba.g;
+                    fData[lIdx + 2] = fillRgba.b;
+                    fData[lIdx + 3] = Math.round(currentOpacity * 255);
+                }
+            }
+        }
+        fCtx.putImageData(fImg, 0, 0);
+
+        playDropSound();
+
+        const strokeId = `fill-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        if (broadcast) {
+            wsSend({
+                type: 'fill',
+                stroke_id: strokeId,
+                x: normX,
+                y: normY,
+                color: fillColorHex,
+                tolerance: 42
+            });
+        }
+
+        isPhoneFillAnimating = true;
+        const animStart = performance.now();
+        const animDuration = 320;
+        const maxRadiusCss = Math.max(12, maxDist / dpr);
+
+        function animateBloom(now) {
+            const elapsed = now - animStart;
+            const progress = Math.min(1.0, elapsed / animDuration);
+            const ease = 1 - Math.pow(1 - progress, 2);
+            const currentRadius = Math.max(8, maxRadiusCss * ease);
+
+            redrawAll();
+
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(clickCssX, clickCssY, currentRadius, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(
+                fillCanvas,
+                minX / dpr,
+                minY / dpr,
+                bw / dpr,
+                bh / dpr
+            );
+            ctx.restore();
+
+            // Luminous shockwave ripple ring
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(clickCssX, clickCssY, currentRadius, 0, Math.PI * 2);
+            ctx.strokeStyle = fillColorHex;
+            ctx.lineWidth = Math.max(1, 3.5 * (1 - progress));
+            ctx.globalAlpha = Math.max(0, 0.75 * (1 - progress));
+            ctx.stroke();
+
+            // Center droplet splash ring
+            const centerRippleR = Math.min(24, currentRadius * 0.4);
+            ctx.beginPath();
+            ctx.arc(clickCssX, clickCssY, centerRippleR, 0, Math.PI * 2);
+            ctx.strokeStyle = '#ffffff';
+            ctx.lineWidth = Math.max(1, 2 * (1 - progress));
+            ctx.globalAlpha = Math.max(0, 0.5 * (1 - progress));
+            ctx.stroke();
+            ctx.restore();
+
+            if (progress < 1.0) {
+                requestAnimationFrame(animateBloom);
+            } else {
+                isPhoneFillAnimating = false;
+                const fillItem = {
+                    stroke_id: strokeId,
+                    type: 'fill',
+                    isFill: true,
+                    color: fillColorHex,
+                    opacity: currentOpacity,
+                    normX: normX,
+                    normY: normY,
+                    fillCanvas: fillCanvas,
+                    normBounds: {
+                        x: (minX / dpr - mapping.artX) / mapping.artW,
+                        y: (minY / dpr - mapping.artY) / mapping.artH,
+                        w: (bw / dpr) / mapping.artW,
+                        h: (bh / dpr) / mapping.artH
+                    }
+                };
+                strokeHistory.push(fillItem);
+                redoHistory = [];
+                redrawAll();
+            }
+        }
+
+        requestAnimationFrame(animateBloom);
+    }
+
+    // ================================================================
     //  6. UI CONTROLLER  — DOM bindings, settings, brush preview
     // ================================================================
     function initUI() {
@@ -759,14 +1354,60 @@
         highlightActiveQuickSize();
         updateBrushPreview();
 
+        // ---- Broadcast tool state to laptop ----
+        function broadcastToolUpdate() {
+            wsSend({
+                type: 'tool_update',
+                brush: currentBrush,
+                shape: currentShape,
+                size: currentSize,
+                color: currentColor,
+                opacity: currentOpacity,
+                smoothing: currentSmoothing
+            });
+        }
+
         // ---- Brush strip ----
         brushBtns.forEach(btn => {
             btn.addEventListener('click', () => {
                 const b = btn.dataset.brush;
+                if (b === 'shape') {
+                    currentBrush = 'shape';
+                    highlightActiveBrush();
+                    toggleDrawer('drawer-shapes', btn);
+                    broadcastToolUpdate();
+                    return;
+                }
                 if (b === 'eraser' && currentBrush !== 'eraser') previousBrush = currentBrush;
                 currentBrush = b;
                 highlightActiveBrush();
                 updateBrushPreview();
+                broadcastToolUpdate();
+            });
+        });
+
+        // ---- Shapes Drawer Selection ----
+        const phoneShapeCards = $$('.phone-shape-card');
+        const phoneShapeIconWrap = $('#phone-shape-icon-wrap');
+        const phoneShapeText = $('#phone-shape-text');
+
+        phoneShapeCards.forEach(card => {
+            card.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const sh = card.dataset.shape;
+                if (!sh) return;
+                currentShape = sh;
+                currentBrush = 'shape';
+                if (phoneShapeIconWrap && SHAPE_SVGS[sh]) {
+                    phoneShapeIconWrap.innerHTML = SHAPE_SVGS[sh];
+                }
+                if (phoneShapeText) {
+                    phoneShapeText.textContent = sh.charAt(0).toUpperCase() + sh.slice(1);
+                }
+                phoneShapeCards.forEach(c => c.classList.toggle('active', c.dataset.shape === sh));
+                highlightActiveBrush();
+                closeAllDrawers();
+                broadcastToolUpdate();
             });
         });
 
@@ -778,6 +1419,7 @@
             localStorage.setItem('pdp_size', currentSize);
             highlightActiveQuickSize();
             updateBrushPreview();
+            broadcastToolUpdate();
         });
 
         quickSizeBtns.forEach(btn => {
@@ -789,6 +1431,7 @@
                 localStorage.setItem('pdp_size', currentSize);
                 highlightActiveQuickSize();
                 updateBrushPreview();
+                broadcastToolUpdate();
             });
         });
 
@@ -798,6 +1441,7 @@
             opacityVal.textContent = Math.round(currentOpacity * 100) + '%';
             localStorage.setItem('pdp_opacity', currentOpacity);
             updateBrushPreview();
+            broadcastToolUpdate();
         });
 
         // ---- Color palette ----
@@ -811,6 +1455,7 @@
                     highlightActiveBrush();
                 }
                 updateBrushPreview();
+                broadcastToolUpdate();
             });
         });
         customColorIn.addEventListener('input', () => {
@@ -822,6 +1467,7 @@
                 highlightActiveBrush();
             }
             updateBrushPreview();
+            broadcastToolUpdate();
         });
 
         // ---- Smoothing ----
@@ -830,6 +1476,7 @@
                 currentSmoothing = btn.dataset.smooth;
                 localStorage.setItem('pdp_smooth', currentSmoothing);
                 highlightActiveSmoothing();
+                broadcastToolUpdate();
             });
         });
 
@@ -1213,6 +1860,15 @@
             previewCtx.beginPath();
             previewCtx.arc(20, 20, Math.min(previewSize, 14), 0, Math.PI*2);
             previewCtx.stroke();
+        } else if (currentBrush === 'bucket') {
+            previewCtx.globalAlpha = currentOpacity;
+            previewCtx.fillStyle = currentColor;
+            previewCtx.beginPath();
+            previewCtx.arc(20, 20, 11, 0, Math.PI * 2);
+            previewCtx.fill();
+            previewCtx.strokeStyle = 'rgba(255,255,255,0.5)';
+            previewCtx.lineWidth = 1.5;
+            previewCtx.stroke();
         } else {
             previewCtx.globalAlpha = currentOpacity;
             previewCtx.strokeStyle = currentColor;
@@ -1257,11 +1913,22 @@
                     aspect_ratio: cssW / Math.max(1, cssH),
                     strokes: strokeHistory
                 });
+                // Sync active tool and brush settings on connect
+                wsSend({
+                    type: 'tool_update',
+                    brush: currentBrush,
+                    size: currentSize,
+                    color: currentColor,
+                    opacity: currentOpacity,
+                    smoothing: currentSmoothing
+                });
             };
             socket.onmessage = (ev) => {
                 try {
                     const m = JSON.parse(ev.data);
-                    if (m.type === 'import_image') {
+                    if (m.type === 'fill') {
+                        performPhoneAnimatedFill(m.x, m.y, m.color, false);
+                    } else if (m.type === 'import_image') {
                         handleIncomingImage(m);
                     } else if (m.type === 'clear_image') {
                         handleIncomingClearImage();
@@ -1281,11 +1948,70 @@
                             strokeHistory.push(redoHistory.pop());
                             redrawAll();
                         }
+                    } else if (m.type === 'tool_update') {
+                        if (m.size !== undefined) {
+                            currentSize = Math.round(m.size);
+                            sliderSize.value = currentSize;
+                            sizeVal.textContent = currentSize + 'px';
+                            if (dockSizeLabel) dockSizeLabel.textContent = currentSize + 'px';
+                            localStorage.setItem('pdp_size', currentSize);
+                            highlightActiveQuickSize();
+                        }
+                        if (m.shape) {
+                            currentShape = m.shape;
+                            const phoneShapeIconWrap = $('#phone-shape-icon-wrap');
+                            const phoneShapeText = $('#phone-shape-text');
+                            if (phoneShapeIconWrap && SHAPE_SVGS[m.shape]) {
+                                phoneShapeIconWrap.innerHTML = SHAPE_SVGS[m.shape];
+                            }
+                            if (phoneShapeText) {
+                                phoneShapeText.textContent = m.shape.charAt(0).toUpperCase() + m.shape.slice(1);
+                            }
+                            $$('.phone-shape-card').forEach(c => c.classList.toggle('active', c.dataset.shape === m.shape));
+                        }
+                        if (m.brush) {
+                            currentBrush = m.brush;
+                            highlightActiveBrush();
+                        }
+                        if (m.color) {
+                            currentColor = m.color;
+                            localStorage.setItem('pdp_color', currentColor);
+                            highlightActiveColor();
+                        }
+                        if (m.opacity !== undefined) {
+                            currentOpacity = m.opacity;
+                            sliderOpacity.value = Math.round(currentOpacity * 100);
+                            opacityVal.textContent = Math.round(currentOpacity * 100) + '%';
+                            localStorage.setItem('pdp_opacity', currentOpacity);
+                        }
+                        if (m.smoothing) {
+                            currentSmoothing = m.smoothing;
+                            highlightActiveSmoothing();
+                        }
+                        updateBrushPreview();
+                    } else if (m.type === 'shape_preview') {
+                        remotePhoneShapePreview = {
+                            brush: 'pen',
+                            color: m.color || '#ffffff',
+                            size: m.size || 8,
+                            opacity: m.opacity !== undefined ? m.opacity : 1.0,
+                            smoothing: 'off',
+                            points: (m.points || []).map(p => ({
+                                x: p.x,
+                                y: p.y,
+                                px: p.x * cssW,
+                                py: p.y * cssH,
+                                pressure: 0.8
+                            }))
+                        };
+                        scheduleLocalRedraw();
                     } else if (m.type === 'stroke_start') {
+                        remotePhoneShapePreview = null;
                         handleRemoteStrokeStart(m);
                     } else if (m.type === 'stroke_points' || m.type === 'stroke') {
                         handleRemoteStrokePoints(m);
                     } else if (m.type === 'stroke_end') {
+                        remotePhoneShapePreview = null;
                         handleRemoteStrokeEnd(m);
                     }
                 } catch(e) {}

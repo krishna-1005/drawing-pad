@@ -743,21 +743,298 @@ html, body {
     opacity: 0.85;
 }
 
-/* Color Popover Flyout */
-.color-popover {
+.swatches-pair-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* Shapes Dock Button & Popover */
+.dock-shape-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-dim);
+    transition: color 0.15s ease, transform 0.15s ease;
+}
+
+.dock-tool-btn:hover .dock-shape-icon {
+    color: var(--text-main);
+    transform: scale(1.1);
+}
+
+.dock-tool-btn.active .dock-shape-icon {
+    color: #ffffff;
+}
+
+.shapes-popover {
     position: absolute;
-    left: calc(100% + 12px);
-    top: 180px;
+    left: calc(100% + 14px);
+    top: 240px;
     background: var(--bg-panel);
     border: 1px solid var(--border-medium);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-floating);
     padding: 12px;
-    width: 190px;
+    width: 210px;
     display: flex;
     flex-direction: column;
     gap: 10px;
-    z-index: 80;
+    z-index: 90;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+}
+
+.shapes-popover-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.active-shape-name-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--accent-cyan);
+    background: rgba(6, 182, 212, 0.14);
+    border: 1px solid rgba(6, 182, 212, 0.3);
+    padding: 2px 7px;
+    border-radius: 10px;
+}
+
+.shapes-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+}
+
+.shape-opt-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    color: var(--text-dim);
+    padding: 7px 10px;
+    font-size: 0.74rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.shape-opt-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-main);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+.shape-opt-btn.active {
+    background: rgba(99, 102, 241, 0.2);
+    border-color: var(--accent-indigo);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.35);
+}
+
+.shape-opt-btn svg {
+    flex-shrink: 0;
+}
+
+/* Dock Color Swatches & Button */
+.dock-color-tool-btn {
+    position: relative;
+}
+
+.dock-color-bubble-ring {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1px;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+}
+
+.dock-color-tool-btn:hover .dock-color-bubble-ring {
+    transform: scale(1.15);
+    border-color: #ffffff;
+}
+
+.dock-color-bubble {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: block;
+}
+
+/* Header Active Color Pill */
+.header-color-group {
+    display: flex;
+    align-items: center;
+}
+
+.color-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-subtle);
+    border-radius: 14px;
+    padding: 3px 10px;
+    font-size: 0.72rem;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.color-pill:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: var(--border-medium);
+    color: var(--text-main);
+}
+
+.header-color-indicator {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.6);
+    display: inline-block;
+    box-shadow: 0 0 5px rgba(0, 0, 0, 0.5);
+}
+
+/* Color Station in Canvas HUD */
+.hud-color-station {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.hud-color-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 12px;
+    padding: 2px 8px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+    color: var(--text-main);
+    font-size: 0.72rem;
+    transition: all 0.15s ease;
+}
+
+.hud-color-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.hud-color-swatch-ring {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.5);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1px;
+}
+
+.hud-color-swatch {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    display: block;
+    box-shadow: 0 0 6px rgba(0, 0, 0, 0.5);
+}
+
+.hud-color-text {
+    font-size: 0.72rem;
+    color: var(--text-dim);
+}
+
+.hud-color-text strong {
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.hud-quick-palette {
+    display: flex;
+    align-items: center;
+    gap: 3.5px;
+}
+
+.hud-color-chip {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(255, 255, 255, 0.25);
+    cursor: pointer;
+    padding: 0;
+    transition: transform 0.12s ease, border-color 0.12s ease, box-shadow 0.12s ease;
+    outline: none;
+}
+
+.hud-color-chip:hover {
+    transform: scale(1.3);
+    border-color: #ffffff;
+    box-shadow: 0 0 8px rgba(255, 255, 255, 0.7);
+    z-index: 2;
+}
+
+.hud-color-chip.active {
+    border-color: #ffffff;
+    box-shadow: 0 0 0 2px #0f172a, 0 0 0 3.5px #38bdf8;
+    transform: scale(1.15);
+}
+
+.hud-custom-picker-label {
+    position: relative;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 2px;
+}
+
+.hud-rainbow-btn {
+    font-size: 0.92rem;
+    line-height: 1;
+    filter: drop-shadow(0 1px 3px rgba(0,0,0,0.4));
+    transition: transform 0.15s ease;
+}
+
+.hud-rainbow-btn:hover {
+    transform: scale(1.25) rotate(15deg);
+}
+
+.hud-native-color-input {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+    pointer-events: none;
+}
+
+/* Color Popover Flyout */
+.color-popover {
+    position: absolute;
+    left: calc(100% + 14px);
+    top: 380px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-floating);
+    padding: 12px;
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 90;
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
 }
 
 .color-popover-header {
@@ -944,42 +1221,203 @@ html, body {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: opacity 0.1s ease;
+    transition: opacity 0.15s ease;
 }
 
 .stylus-reticle.hidden {
-    display: none;
+    display: none !important;
 }
 
+/* Outer Ring - Dynamic size driven by chosen brush size */
 .reticle-outer-ring {
-    width: 34px;
-    height: 34px;
-    border: 1.5px solid rgba(99, 102, 241, 0.7);
+    width: 24px;
+    height: 24px;
+    border: 1.5px solid rgba(99, 102, 241, 0.85);
     border-radius: 50%;
-    box-shadow: 0 0 8px rgba(99, 102, 241, 0.25);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.35), inset 0 0 4px rgba(99, 102, 241, 0.15);
+    position: absolute;
+    transform: translate(-50%, -50%);
+    top: 50%;
+    left: 50%;
+    transition: width 0.05s ease-out, height 0.05s ease-out, border-color 0.15s ease;
+    box-sizing: border-box;
 }
 
+.reticle-outer-ring.reticle-eraser {
+    border-style: dashed;
+    border-color: rgba(244, 63, 94, 0.85);
+    box-shadow: 0 0 10px rgba(244, 63, 94, 0.35);
+}
+
+.reticle-outer-ring.reticle-bucket {
+    border-style: solid;
+    border-color: #38bdf8;
+    box-shadow: 0 0 12px rgba(56, 189, 248, 0.5), inset 0 0 6px rgba(56, 189, 248, 0.25);
+}
+
+/* Reticle Center Dot */
 .reticle-center-dot {
     width: 4px;
     height: 4px;
     background-color: #ffffff;
     border-radius: 50%;
     position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 4px rgba(255, 255, 255, 0.9);
+    z-index: 3;
 }
 
+/* Reticle Live HUD Tooltip Badge */
 .reticle-hud-badge {
     position: absolute;
-    top: 24px;
-    left: 20px;
-    background: rgba(10, 13, 20, 0.88);
-    border: 1px solid rgba(255, 255, 255, 0.16);
+    top: calc(50% + 14px);
+    left: calc(50% + 14px);
+    background: rgba(8, 11, 18, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: #cbd5e1;
+    white-space: nowrap;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(99, 102, 241, 0.25);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    pointer-events: none;
+    z-index: 4;
+}
+
+.reticle-hud-badge .badge-size {
+    color: #38bdf8;
+    font-weight: 700;
+}
+
+.reticle-hud-badge .badge-pressure {
+    color: #a5b4fc;
+}
+
+/* Canvas HUD Size Wrapper & Interactive Popover */
+.hud-size-wrapper {
+    position: relative;
+    display: inline-flex;
+}
+
+.hud-size-btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    padding: 2px 8px;
+    color: var(--text-dim);
+    font-size: 0.74rem;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.hud-size-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(99, 102, 241, 0.5);
+    color: var(--text-main);
+}
+
+.hud-size-btn strong {
+    color: #38bdf8;
+    font-weight: 700;
+}
+
+.hud-size-popover {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    background: rgba(14, 18, 28, 0.96);
+    border: 1px solid var(--border-medium);
+    border-radius: var(--radius-md);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    padding: 12px;
+    width: 220px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    z-index: 90;
+}
+
+.hud-size-popover.hidden {
+    display: none !important;
+}
+
+.size-popover-header {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--text-dim);
+}
+
+#popover-size-display {
+    color: #38bdf8;
+    font-family: var(--font-mono);
+}
+
+.size-slider-row input[type="range"] {
+    width: 100%;
+    accent-color: #6366f1;
+    cursor: pointer;
+}
+
+.popover-quick-sizes {
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.quick-sz-btn {
+    flex: 1;
+    min-width: 24px;
+    padding: 3px 0;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-subtle);
     border-radius: 4px;
-    padding: 2px 6px;
+    color: var(--text-dim);
+    font-size: 0.7rem;
+    font-family: var(--font-mono);
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s ease;
+}
+
+.quick-sz-btn:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #ffffff;
+}
+
+.quick-sz-btn.active {
+    background: #6366f1;
+    color: #ffffff;
+    border-color: #6366f1;
+    font-weight: 600;
+}
+
+.dock-size-btn {
     font-family: var(--font-mono);
     font-size: 0.68rem;
-    color: #a5b4fc;
-    white-space: nowrap;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+    font-weight: 600;
+    color: #38bdf8;
+}
+
+.dock-size-btn:hover {
+    color: #ffffff;
+    background: rgba(56, 189, 248, 0.18);
+    border: 1px solid rgba(56, 189, 248, 0.4);
 }
 
 /* Canvas Matrix Label (Bottom-Left) */
